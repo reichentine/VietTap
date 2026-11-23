@@ -184,8 +184,8 @@ extern "C" {
         _languageTemp = getAppInputMethodStatus(string(_frontMostApp.UTF8String), vLanguage | (vCodeTable << 1));
         if ((_languageTemp & 0x01) != vLanguage) { //for input method
             if (_languageTemp != -1) {
-                vLanguage = _languageTemp;
-                [appDelegate onImputMethodChanged:NO];
+                vLanguage = _languageTemp & 0x01;
+                [appDelegate onEngineLanguageChanged:NO];
                 startNewSession();
             } else {
                 saveSmartSwitchKeyData();
@@ -505,15 +505,29 @@ extern "C" {
         return true;
     }
     
+    static bool _languageUISyncPending = false;
+
+    // The event tap callback runs on the main thread, and macOS holds every
+    // later key event until it returns. So the hotkey path only flips the
+    // engine state; the icon, preferences, control panel and smart-switch
+    // data are updated right after the callback returns. Several switches
+    // before that update collapse into one update with the final language.
+    void scheduleLanguageUISync() {
+        if (_languageUISyncPending)
+            return;
+        _languageUISyncPending = true;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            _languageUISyncPending = false;
+            [appDelegate onEngineLanguageChanged:YES];
+        });
+    }
+
     void switchLanguage() {
-        if (vLanguage == 0)
-            vLanguage = 1;
-        else
-            vLanguage = 0;
+        vLanguage = (vLanguage == 0) ? 1 : 0;
+        startNewSession();
         if (HAS_BEEP(vSwitchKeyStatus))
             NSBeep();
-        [appDelegate onImputMethodChanged:YES];
-        startNewSession();
+        scheduleLanguageUISync();
     }
     
     void handleMacro() {

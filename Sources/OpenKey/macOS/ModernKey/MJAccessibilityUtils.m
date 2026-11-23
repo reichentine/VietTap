@@ -17,14 +17,9 @@ extern CFStringRef kAXTrustedCheckOptionPrompt __attribute__((weak_import));
 
 
 BOOL MJAccessibilityIsEnabled(void) {
-    BOOL isEnabled = NO;
-    if (AXIsProcessTrustedWithOptions != NULL)
-        isEnabled = AXIsProcessTrustedWithOptions(NULL);
-    else
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        isEnabled = AXAPIEnabled();
-#pragma clang diagnostic pop
+    // AXAPIEnabled() is gone from current SDKs; macOS 11+ always has
+    // AXIsProcessTrustedWithOptions.
+    BOOL isEnabled = AXIsProcessTrustedWithOptions(NULL);
 
 //    HSNSLOG(@"Accessibility is: %@", isEnabled ? @"ENABLED" : @"DISABLED");
     return isEnabled;

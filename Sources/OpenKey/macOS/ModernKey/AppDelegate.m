@@ -10,6 +10,7 @@
 #import <Carbon/Carbon.h>
 #import <Cocoa/Cocoa.h>
 #import <ServiceManagement/ServiceManagement.h>
+#import <os/log.h>
 #import "AppDelegate.h"
 #import "ViewController.h"
 #import "OpenKeyManager.h"
@@ -294,11 +295,33 @@ extern bool convertToolDontAlertWhenCompleted;
 
     [self fillData];
     [viewController fillData];
+    [self setRunOnStartup:YES];
 }
 
 -(void)setRunOnStartup:(BOOL)val {
     CFStringRef appId = (__bridge CFStringRef)@"com.tuyenmai.OpenKeyHelper";
-    SMLoginItemSetEnabled(appId, val);
+    CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
+    if (@available(macOS 13.0, *)) {
+        // Register the app itself as the login item. The old helper login
+        // item is launched by launchd with a launch constraint taken from the
+        // signature that registered it, so a rebuilt (re-signed) copy is
+        // refused by AMFI. Remove the old helper item.
+        SMLoginItemSetEnabled(appId, false);
+        SMAppService *service = [SMAppService mainAppService];
+        NSError *error = nil;
+        if (val && service.status != SMAppServiceStatusEnabled) {
+            [service registerAndReturnError:&error];
+        } else if (!val && service.status == SMAppServiceStatusEnabled) {
+            [service unregisterAndReturnError:&error];
+        }
+        if (error) {
+            os_log_error(OS_LOG_DEFAULT, "OpenKey: login item change failed: %{public}@", error);
+        }
+    } else {
+        SMLoginItemSetEnabled(appId, val);
+    }
+    os_log(OS_LOG_DEFAULT, "OpenKey latency: run-on-startup update took %.1f ms",
+           (CFAbsoluteTimeGetCurrent() - start) * 1000.0);
 }
 
 -(void)setGrayIcon:(BOOL)val {
@@ -336,11 +359,12 @@ extern bool convertToolDontAlertWhenCompleted;
     [theMenu setSubmenu:sub forItem:parent];
 }
 
-- (void) fillData {
-    //fill data
-    NSInteger intInputMethod = [[NSUserDefaults standardUserDefaults] integerForKey:@"InputMethod"];
+// Status bar icon and "Bật Tiếng Việt" check mark only. Cheap: no
+// preference reloads and no login-item calls, so it is safe to run on every
+// language switch.
+-(void)updateInputMethodIndicator:(NSInteger)language {
     NSInteger grayIcon = [[NSUserDefaults standardUserDefaults] integerForKey:@"GrayIcon"];
-    if (intInputMethod == 1) {
+    if (language == 1) {
         [menuInputMethod setState:NSControlStateValueOn];
         statusItem.button.image = [NSImage imageNamed:@"Status"];
         [statusItem.button.image setTemplate:(grayIcon ? YES : NO)];
@@ -351,6 +375,12 @@ extern bool convertToolDontAlertWhenCompleted;
         [statusItem.button.image setTemplate:(grayIcon ? YES : NO)];
         statusItem.button.alternateImage = [NSImage imageNamed:@"StatusHighlightedEng"];
     }
+}
+
+- (void) fillData {
+    //fill data
+    NSInteger intInputMethod = [[NSUserDefaults standardUserDefaults] integerForKey:@"InputMethod"];
+    [self updateInputMethodIndicator:intInputMethod];
     vLanguage = (int)intInputMethod;
     
     NSInteger intInputType = [[NSUserDefaults standardUserDefaults] integerForKey:@"InputType"];
@@ -389,25 +419,26 @@ extern bool convertToolDontAlertWhenCompleted;
         [mnuVietnameseLocaleCP1258 setState:NSControlStateValueOn];
     }
     vCodeTable = (int)intCode;
-    
-    //
-    NSInteger intRunOnStartup = [[NSUserDefaults standardUserDefaults] integerForKey:@"RunOnStartup"];
-    [self setRunOnStartup:intRunOnStartup ? YES : NO];
 
+    // fillData used to call setRunOnStartup here. That is a synchronous IPC
+    // call to the login-item service (SMLoginItemSetEnabled), and fillData ran
+    // on every language switch, inside the keyboard event tap. Run on startup
+    // is now applied only at launch, on reset, and when the checkbox changes.
 }
 
 -(void)onImputMethodChanged:(BOOL)willNotify {
     NSInteger intInputMethod = [[NSUserDefaults standardUserDefaults] integerForKey:@"InputMethod"];
-    if (intInputMethod == 0)
-        intInputMethod = 1;
-    else
-        intInputMethod = 0;
-    vLanguage = (int)intInputMethod;
-    [[NSUserDefaults standardUserDefaults] setInteger:intInputMethod forKey:@"InputMethod"];
+    vLanguage = (intInputMethod == 0) ? 1 : 0;
+    [self onEngineLanguageChanged:willNotify];
+}
 
-    [self fillData];
+// Makes the saved preference, the status bar icon and the control panel show
+// the engine's current vLanguage.
+-(void)onEngineLanguageChanged:(BOOL)willNotify {
+    [[NSUserDefaults standardUserDefaults] setInteger:vLanguage forKey:@"InputMethod"];
+    [self updateInputMethodIndicator:vLanguage];
     [viewController fillData];
-    
+
     if (willNotify)
         OnInputMethodChanged();
 }

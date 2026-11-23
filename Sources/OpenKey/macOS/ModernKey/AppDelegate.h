@@ -14,6 +14,7 @@
 @interface AppDelegate : NSObject <NSApplicationDelegate>
 
 -(void)onImputMethodChanged:(BOOL)willNotify;
+-(void)onEngineLanguageChanged:(BOOL)willNotify;
 -(void)onInputMethodSelected;
 
 -(void)askPermission;
