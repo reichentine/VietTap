@@ -14,8 +14,8 @@ SRC="$ROOT/Sources/VietTap"
 OUT="$ROOT/build"
 OBJ="$OUT/obj-viettap"
 APP="$OUT/VietTap.app"
-# App icon: OpenKey's icon from the reference bundle, unless ICON is given.
-ICON="${ICON:-$OUT/OpenKey-2.0.5-original.app/Contents/Resources/Icon.icns}"
+# App icon: Sources/VietTap/AppIcon.icns, unless ICON is given.
+ICON="${ICON:-$SRC/AppIcon.icns}"
 
 rm -rf "$OBJ" "$APP"
 mkdir -p "$OBJ"

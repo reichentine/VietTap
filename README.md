@@ -84,8 +84,8 @@ if your keychain has one, and ad hoc otherwise. With a stable identity, the
 Accessibility permission stays valid after a rebuild; with an ad hoc signature,
 you must grant it again after each build.
 
-`ICON=/path/to/AppIcon.icns ./build_viettap.sh` sets the app icon. Without
-it, the script uses OpenKey's icon from a reference OpenKey bundle if present.
+The app icon is `Sources/VietTap/AppIcon.icns`. To use another icon, run
+`ICON=/path/to/AppIcon.icns ./build_viettap.sh`.
 
 ## Using a downloaded build
 
