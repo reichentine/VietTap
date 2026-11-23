@@ -16,6 +16,7 @@
 //
 
 #import <Cocoa/Cocoa.h>
+#import <os/log.h>
 #import "Engine.h"
 #import "GTVHook.h"
 
@@ -39,8 +40,8 @@ int vCheckSpelling = 1;           // Settings
 int vUseModernOrthography = 0;
 int vQuickTelex = 0;
 int vSwitchKeyStatus = GTVHotKeyControlShift; // Settings
-int vRestoreIfWrongSpelling = 0;
-int vFixRecommendBrowser = 1;     // browser autocomplete fix (fixed on)
+int vRestoreIfWrongSpelling = 0;  // off: a wrong word stays visible, as a sign to switch input
+int vFixRecommendBrowser = 1;     // autocomplete fix, only in the apps of _autocompleteApps
 int vUseMacro = 0;
 int vUseMacroInEnglishMode = 0;
 int vAutoCapsMacro = 0;
@@ -58,9 +59,54 @@ int vFixChromiumBrowser = 1;      // Chromium autocomplete fix (fixed on)
 
 static CFMachPortRef _eventTap = NULL;
 static CFRunLoopSourceRef _runLoopSource = NULL;
+static CFMachPortRef _targetTap = NULL;
+static CFRunLoopSourceRef _targetRunLoopSource = NULL;
 static BOOL _paused = NO;
+static BOOL _sourcePaused = NO;
 static void (^_languageObserver)(void) = nil;
 static NSString *_ownBundleID = nil;
+
+// ---------------------------------------------------------------------------
+// Autocomplete fix per app.
+// Fields with inline autocomplete (browser address bars, Spotlight) select
+// the suggested rest of the word, so the first synthetic Backspace would
+// delete the suggestion instead of a letter. OpenKey's fix: type an
+// invisible character first (or, in Chromium browsers, select one letter
+// with Shift+Left). OpenKey applied it in every app; here only the apps that
+// have such fields get it, so other apps get fewer synthetic keys.
+// Extra apps: defaults write com.sonvu.gotiengviet AutocompleteFixApps -array <bundle id> ...
+// ---------------------------------------------------------------------------
+enum { GTVFixNone = 0, GTVFixInvisibleChar = 1, GTVFixSelectLeft = 2 };
+
+// OpenKey's Chromium list (exact match): Shift+Left instead of the invisible character.
+static NSArray *_selectLeftApps = @[@"com.google.Chrome", @"com.brave.Browser",
+                                    @"com.microsoft.edgemac.Dev", @"com.microsoft.edgemac.Beta",
+                                    @"com.microsoft.Edge.Dev", @"com.microsoft.Edge"];
+static NSArray *_autocompleteApps = @[
+    @"com.apple.Spotlight",
+    @"com.apple.Safari", @"com.apple.SafariTechnologyPreview",
+    @"org.mozilla.firefox", @"org.mozilla.firefoxdeveloperedition", @"org.mozilla.nightly",
+    @"com.microsoft.edgemac", @"com.microsoft.edgemac.Canary",
+    @"com.google.Chrome.canary", @"com.google.Chrome.beta", @"com.google.Chrome.dev",
+    @"com.brave.Browser.beta", @"com.brave.Browser.nightly",
+    @"org.chromium.Chromium", @"company.thebrowser.Browser", @"company.thebrowser.dia",
+    @"com.vivaldi.Vivaldi", @"com.operasoftware.Opera", @"com.operasoftware.OperaGX",
+    @"app.zen-browser.zen", @"com.kagi.kagimacOS", @"com.duckduckgo.macos.browser",
+];
+static NSArray *_extraAutocompleteApps = @[];
+
+static int _targetFix = GTVFixNone;   // fix mode of the app that gets the keys
+static pid_t _targetPid = 0;
+
+static int fixModeForApp(NSString *bundleID) {
+    if (bundleID == nil)
+        return GTVFixNone;
+    if ([_selectLeftApps containsObject:bundleID])
+        return GTVFixSelectLeft;
+    if ([_autocompleteApps containsObject:bundleID] || [_extraAutocompleteApps containsObject:bundleID])
+        return GTVFixInvisibleChar;
+    return GTVFixNone;
+}
 
 extern "C" {
     //app which must sent special empty character
@@ -108,6 +154,10 @@ extern "C" {
         NSString *front = [[NSWorkspace sharedWorkspace] frontmostApplication].bundleIdentifier;
         if (front != nil && ![front isEqualToString:_ownBundleID])
             _frontMostApp = front;
+        NSArray *extra = [prefs arrayForKey:@"AutocompleteFixApps"];
+        if (extra != nil)
+            _extraAutocompleteApps = extra;
+        _targetFix = fixModeForApp(_frontMostApp);
 
         vLanguage = (int)[prefs integerForKey:GTVPrefLanguage] ? 1 : 0;
         vSwitchKeyStatus = (int)[prefs integerForKey:GTVPrefSwitchKey];
@@ -179,6 +229,10 @@ extern "C" {
         if (bundleID == nil || [bundleID isEqualToString:_ownBundleID])
             return; // keep the last real app while Settings is in front
         _frontMostApp = bundleID;
+        // Correct from the first key in the new app; the target tap refines
+        // it for panels that do not become the front app (Spotlight).
+        _targetFix = fixModeForApp(bundleID);
+        _targetPid = 0;
         if (!vUseSmartSwitchKey)
             return;
         _languageTemp = getAppInputMethodStatus(string(_frontMostApp.UTF8String), vLanguage | (vCodeTable << 1));
@@ -474,6 +528,7 @@ extern "C" {
 
     void switchLanguage() {
         vLanguage = (vLanguage == 0) ? 1 : 0;
+        os_log(OS_LOG_DEFAULT, "GTV: switch key, language %d", vLanguage);
         startNewSession();
         scheduleLanguageDidChange();
     }
@@ -549,12 +604,14 @@ extern "C" {
         // macOS turns the tap off when a callback is too slow or when secure
         // input starts; turn it on again.
         if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
+            os_log(OS_LOG_DEFAULT, "GTV: macOS turned the hook off (%{public}s), turning it on",
+                   type == kCGEventTapDisabledByTimeout ? "timeout" : "user input");
             if (_eventTap != NULL)
                 CGEventTapEnable(_eventTap, true);
             return event;
         }
 
-        if (_paused)
+        if (_paused || _sourcePaused)
             return event;
 
         //dont handle my event
@@ -642,9 +699,9 @@ extern "C" {
                 return event;
             } else if (pData->code == vWillProcess || pData->code == vRestore || pData->code == vRestoreAndStartNewSession) { //handle result signal
 
-                //fix autocomplete
-                if (vFixRecommendBrowser && pData->extCode != 4) {
-                    if (vFixChromiumBrowser && [_unicodeCompoundApp containsObject:_frontMostApp]) {
+                //fix autocomplete (only in apps with inline autocomplete)
+                if (vFixRecommendBrowser && _targetFix != GTVFixNone && pData->extCode != 4) {
+                    if (vFixChromiumBrowser && _targetFix == GTVFixSelectLeft) {
                         if (pData->backspaceCount > 0) {
                             SendShiftAndLeftArrow();
                             if (pData->backspaceCount == 1)
@@ -690,6 +747,56 @@ extern "C" {
         return event;
     }
 
+    // Second tap, placed after macOS has chosen the app that gets each key
+    // (annotated session tap). It only reads that app, so that a panel that
+    // never becomes the front app (Spotlight) gets the right autocomplete fix
+    // from its next key on. It never changes, holds or drops an event.
+    CGEventRef TargetCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+        if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
+            if (_targetTap != NULL)
+                CGEventTapEnable(_targetTap, true);
+            return event;
+        }
+        pid_t pid = (pid_t)CGEventGetIntegerValueField(event, kCGEventTargetUnixProcessID);
+        if (pid > 0 && pid != _targetPid) {
+            _targetPid = pid;
+            NSString *bundleID = [NSRunningApplication runningApplicationWithProcessIdentifier:pid].bundleIdentifier;
+            int mode = fixModeForApp(bundleID);
+            if (mode != _targetFix)
+                os_log(OS_LOG_DEFAULT, "GTV: keys go to %{public}@, autocomplete fix %d", bundleID, mode);
+            _targetFix = mode;
+        }
+        return event;
+    }
+
+    static void startTargetTap() {
+        _targetTap = CGEventTapCreate(kCGAnnotatedSessionEventTap,
+                                      kCGTailAppendEventTap,
+                                      kCGEventTapOptionDefault,
+                                      CGEventMaskBit(kCGEventKeyDown),
+                                      TargetCallback,
+                                      NULL);
+        if (_targetTap == NULL) {
+            os_log(OS_LOG_DEFAULT, "GTV: target tap not available, using the front app only");
+            return;
+        }
+        _targetRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, _targetTap, 0);
+        CFRunLoopAddSource(CFRunLoopGetMain(), _targetRunLoopSource, kCFRunLoopCommonModes);
+        CGEventTapEnable(_targetTap, true);
+    }
+
+    static void stopTargetTap() {
+        if (_targetTap == NULL)
+            return;
+        CGEventTapEnable(_targetTap, false);
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), _targetRunLoopSource, kCFRunLoopCommonModes);
+        CFRelease(_targetRunLoopSource);
+        _targetRunLoopSource = NULL;
+        CFMachPortInvalidate(_targetTap);
+        CFRelease(_targetTap);
+        _targetTap = NULL;
+    }
+
     BOOL GTVHookStart() {
         if (_eventTap != NULL)
             return YES;
@@ -711,11 +818,13 @@ extern "C" {
         _runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, _eventTap, 0);
         CFRunLoopAddSource(CFRunLoopGetMain(), _runLoopSource, kCFRunLoopCommonModes);
         CGEventTapEnable(_eventTap, true);
+        startTargetTap();
         startNewSession();
         return YES;
     }
 
     void GTVHookStop() {
+        stopTargetTap();
         if (_eventTap == NULL)
             return;
         CGEventTapEnable(_eventTap, false);
@@ -729,6 +838,29 @@ extern "C" {
 
     BOOL GTVHookIsRunning() {
         return _eventTap != NULL && CGEventTapIsEnabled(_eventTap);
+    }
+    
+    // Turns the taps on again if macOS turned them off without telling the
+    // callback. Called every few seconds by the app.
+    void GTVHookWatchdog() {
+        if (_eventTap != NULL && !CGEventTapIsEnabled(_eventTap)) {
+            os_log(OS_LOG_DEFAULT, "GTV: watchdog found the hook off, turning it on");
+            CGEventTapEnable(_eventTap, true);
+        }
+        if (_targetTap != NULL && !CGEventTapIsEnabled(_targetTap))
+            CGEventTapEnable(_targetTap, true);
+    }
+
+    void GTVHookSetInputSourcePaused(BOOL paused) {
+        if (paused == _sourcePaused)
+            return;
+        _sourcePaused = paused;
+        _lastFlag = 0;
+        startNewSession();
+    }
+
+    BOOL GTVHookIsInputSourcePaused() {
+        return _sourcePaused;
     }
 
     void GTVHookSetPaused(BOOL paused) {

@@ -6,6 +6,7 @@
 # Usage: ./build_gotiengviet.sh
 # Output: build/GoTiengViet.app (arm64)
 set -euo pipefail
+shopt -s nullglob # a source folder may have no .cpp or .m files
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 ENGINE="$ROOT/Sources/OpenKey/engine"
@@ -27,6 +28,9 @@ for f in Engine.cpp Vietnamese.cpp Macro.cpp SmartSwitchKey.cpp; do
 done
 
 # App.
+for f in "$SRC"/*.cpp; do
+  clang++ -std=gnu++14 -stdlib=libc++ "${COMMON[@]}" -Wall -c "$f" -o "$OBJ/$(basename "$f").o"
+done
 for f in "$SRC"/*.mm; do
   clang++ -std=gnu++14 -stdlib=libc++ "${COMMON[@]}" -Wall -Wno-unused-variable \
     -c "$f" -o "$OBJ/$(basename "$f").o"

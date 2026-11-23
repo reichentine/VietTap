@@ -31,6 +31,20 @@ changes are about latency and robustness:
   after the callback returns.
 - **The front app is cached** from `NSWorkspace` notifications instead of being
   queried on every key.
+- **The autocomplete fix runs only where it is needed.** OpenKey types an
+  invisible character and one more Backspace on every rewrite, in every app,
+  to protect fields with inline autocomplete. Here only browsers and Spotlight
+  get it (a second, read-only event tap sees which app gets the keys, because
+  Spotlight never becomes the front app). In a test paragraph this cuts the
+  synthetic keys per rewrite from 9.1 to 5.1 in all other apps. Add an app
+  with `defaults write com.sonvu.gotiengviet AutocompleteFixApps -array <bundle id>`.
+- **It pauses while a macOS input method is selected** (for example Apple's
+  Vietnamese input or a Japanese input), so that no key is converted twice.
+  Its gray icon then shows V if that input is Vietnamese, E otherwise. A
+  keyboard layout such as ABC turns it on again.
+- **The hook turns itself on again** when macOS turns it off (a slow callback
+  or secure text entry), and a check every 5 seconds catches the cases where
+  macOS does not tell the callback.
 - **No nested run loop.** OpenKey 2.0.5 started the tap with `CFRunLoopRun()`
   inside a main-queue block, which blocked the main dispatch queue (upstream
   fixed this in a582ac4).

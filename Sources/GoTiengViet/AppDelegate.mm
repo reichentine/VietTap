@@ -9,6 +9,7 @@
 
 #import "AppDelegate.h"
 #import <ApplicationServices/ApplicationServices.h>
+#import <Carbon/Carbon.h>
 #import <ServiceManagement/ServiceManagement.h>
 #import <os/log.h>
 #import "GTVHook.h"
@@ -63,6 +64,8 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     NSButton *_smartSwitchBox;
     NSButton *_openAtLoginBox;
     NSTimer *_permissionTimer;
+    NSString *_pausingSourceName; // input method that pauses the hook, if any
+    BOOL _pausingSourceIsVietnamese; // its language, for the gray V/E icon
 }
 
 #pragma mark - Launch
@@ -84,6 +87,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     });
 
     [self observeWorkspace];
+    [self observeInputSource];
     [self applyOpenAtLoginPreference];
 
     if (AXIsProcessTrusted()) {
@@ -128,6 +132,12 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
         return;
     }
     os_log(OS_LOG_DEFAULT, "GTV: keyboard hook running");
+    static NSTimer *watchdog;
+    [watchdog invalidate];
+    watchdog = [NSTimer scheduledTimerWithTimeInterval:5.0 repeats:YES block:^(NSTimer *timer) {
+        GTVHookWatchdog();
+    }];
+    watchdog.tolerance = 1.0;
     [self updateLanguageUI];
 }
 
@@ -209,21 +219,80 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 
 - (void)updateLanguageUI {
     BOOL running = GTVHookIsRunning();
+    BOOL paused = GTVHookIsInputSourcePaused();
     BOOL vietnamese = GTVGetLanguage() == 1;
-    _statusItem.button.image = GTVStatusImage(vietnamese && running);
-    _statusItem.button.appearsDisabled = !running;
-    _statusItem.button.toolTip = !running ? [NSString stringWithFormat:@"%@: needs Accessibility access", kAppName]
-                               : [NSString stringWithFormat:@"%@: %@", kAppName, vietnamese ? @"Vietnamese" : @"English"];
+    // While paused, show the language of the selected input method, so that
+    // typing Vietnamese with another input method does not show [E].
+    _statusItem.button.image = GTVStatusImage(paused ? _pausingSourceIsVietnamese : (vietnamese && running));
+    _statusItem.button.appearsDisabled = !running || paused;
+    if (!running)
+        _statusItem.button.toolTip = [NSString stringWithFormat:@"%@: needs Accessibility access", kAppName];
+    else if (paused)
+        _statusItem.button.toolTip = [NSString stringWithFormat:@"%@: paused while %@ is selected", kAppName, _pausingSourceName];
+    else
+        _statusItem.button.toolTip = [NSString stringWithFormat:@"%@: %@", kAppName, vietnamese ? @"Vietnamese" : @"English"];
 
     _permissionItem.hidden = running;
     _permissionSeparator.hidden = running;
-    _languageItem.enabled = running;
+    _languageItem.enabled = running && !paused;
     _languageItem.state = vietnamese ? NSControlStateValueOn : NSControlStateValueOff;
     if (@available(macOS 14.4, *)) {
         int hotKey = (int)[[NSUserDefaults standardUserDefaults] integerForKey:GTVPrefSwitchKey];
-        _languageItem.subtitle = [NSString stringWithFormat:@"Switch: %@",
-                                  [GTVShortcutField displayStringForHotKey:hotKey]];
+        _languageItem.subtitle = paused
+            ? [NSString stringWithFormat:@"Paused: %@ is selected", _pausingSourceName]
+            : [NSString stringWithFormat:@"Switch: %@", [GTVShortcutField displayStringForHotKey:hotKey]];
     }
+}
+
+#pragma mark - Input source
+
+// Pause while a macOS input method is the selected input source, so that a
+// key is never converted by both. A plain keyboard layout (ABC, U.S., ...)
+// turns the hook on again.
+- (void)observeInputSource {
+    [[NSDistributedNotificationCenter defaultCenter]
+        addObserver:self selector:@selector(inputSourceChanged:)
+               name:(__bridge NSString *)kTISNotifySelectedKeyboardInputSourceChanged
+             object:nil suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+    [self inputSourceChanged:nil];
+}
+
+- (void)inputSourceChanged:(NSNotification *)note {
+    [self checkInputSource];
+    if (note != nil) {
+        // The notice can come a moment before the new input is active (for
+        // example from the input menu), so check again shortly after.
+        __weak GTVAppDelegate *weakSelf = self;
+        for (NSNumber *delay in @[@0.2, @1.0]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{ [weakSelf checkInputSource]; });
+        }
+    }
+}
+
+- (void)checkInputSource {
+    BOOL isLayout = YES;
+    TISInputSourceRef source = TISCopyCurrentKeyboardInputSource();
+    if (source != NULL) {
+        CFStringRef type = (CFStringRef)TISGetInputSourceProperty(source, kTISPropertyInputSourceType);
+        isLayout = type == NULL || CFEqual(type, kTISTypeKeyboardLayout);
+        _pausingSourceName = [(__bridge NSString *)TISGetInputSourceProperty(source, kTISPropertyLocalizedName) copy];
+        NSString *sourceID = (__bridge NSString *)TISGetInputSourceProperty(source, kTISPropertyInputSourceID);
+        NSArray *languages = (__bridge NSArray *)TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages);
+        if ([sourceID hasPrefix:@"com.sonvu.inputmethod.GoTiengViet."])
+            _pausingSourceIsVietnamese = [sourceID hasSuffix:@".vi"];
+        else
+            _pausingSourceIsVietnamese = [languages.firstObject isEqual:@"vi"];
+        os_log_debug(OS_LOG_DEFAULT, "GTV: input source %{public}@, type %{public}@",
+                     (__bridge NSString *)TISGetInputSourceProperty(source, kTISPropertyInputSourceID),
+                     (__bridge NSString *)type);
+        CFRelease(source);
+    }
+    if (isLayout == GTVHookIsInputSourcePaused())
+        os_log(OS_LOG_DEFAULT, "GTV: %{public}s (input source: %{public}@)",
+               isLayout ? "resumed" : "paused", _pausingSourceName);
+    GTVHookSetInputSourcePaused(!isLayout);
+    [self updateLanguageUI];
 }
 
 - (void)toggleLanguage:(id)sender {
@@ -344,14 +413,16 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 }
 
 - (void)applyOpenAtLoginPreference {
-    // Register when the preference is on and the item is not there yet
-    // ("not registered", or "not found" for a new app). If the user turned
-    // the item off in System Settings, the status is "requires approval",
-    // and the app respects that choice.
+    // The "Open at login" setting decides. Register when it is on and the
+    // item is not there yet ("not registered", or "not found" for a new app);
+    // remove the item when it is off. If the user turned the item off in
+    // System Settings, the status is "requires approval" and stays so.
+    BOOL wanted = [[NSUserDefaults standardUserDefaults] boolForKey:GTVPrefOpenAtLogin];
     SMAppServiceStatus status = SMAppService.mainAppService.status;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:GTVPrefOpenAtLogin] &&
-        status != SMAppServiceStatusEnabled && status != SMAppServiceStatusRequiresApproval)
+    if (wanted && status != SMAppServiceStatusEnabled && status != SMAppServiceStatusRequiresApproval)
         [self setOpenAtLogin:YES];
+    else if (!wanted && status == SMAppServiceStatusEnabled)
+        [self setOpenAtLogin:NO];
 }
 
 #pragma mark - Workspace

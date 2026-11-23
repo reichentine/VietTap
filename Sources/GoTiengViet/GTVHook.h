@@ -37,9 +37,18 @@ BOOL GTVHookStart(void);
 void GTVHookStop(void);
 BOOL GTVHookIsRunning(void);
 
+/// Turns the taps on again if macOS turned them off. Call every few seconds.
+void GTVHookWatchdog(void);
+
 /// While paused, the hook passes every event through (used while the
 /// Settings window records a new switch key).
 void GTVHookSetPaused(BOOL paused);
+
+/// While a macOS input method (not a plain keyboard layout) is selected, for
+/// example Apple's Vietnamese input or a Japanese input, the hook passes
+/// every event through, so that no key is converted twice.
+void GTVHookSetInputSourcePaused(BOOL paused);
+BOOL GTVHookIsInputSourcePaused(void);
 
 int  GTVGetLanguage(void);
 void GTVToggleLanguage(void);
