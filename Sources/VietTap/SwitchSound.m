@@ -1,6 +1,6 @@
 //
 //  SwitchSound.m
-//  Gõ Tiếng Việt
+//  VietTap
 //
 
 #import "SwitchSound.h"
@@ -11,7 +11,7 @@ static const float kVolume = 0.35f; // softer than a normal alert
 static NSSound *_vietnameseSound = nil;
 static NSSound *_englishSound = nil;
 
-@implementation GTVSwitchSound
+@implementation VTSwitchSound
 
 + (void)prepare {
     // Copies, so that the volume change does not touch the shared instances.

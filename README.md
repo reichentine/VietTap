@@ -1,105 +1,109 @@
+# VietTap
 
-# [OpenKey](http://open-key.org)
-### [Download bản mới nhất](https://github.com/tuyenvm/OpenKey/releases)
-[![GitHub release](https://img.shields.io/github/v/release/tuyenvm/OpenKey.svg)](https://github.com/tuyenvm/OpenKey/releases/latest)
+A lean Vietnamese input app for macOS that lives only in the menu bar. It uses
+the typing engine of [OpenKey](https://github.com/tuyenvm/OpenKey) by Tuyen Mai,
+unchanged, with a much smaller app around it.
 
-### Open source Vietnamese Input App for macOS - Bộ gõ tiếng Việt nguồn mở cho macOS.
-Bộ gõ tiếng Việt mới cho macOS, sử dụng kỹ thuật `Backspace`. Loại bỏ lỗi gạch chân khó chịu ở bộ gõ mặc định. Hoàn toàn miễn phí và là nguồn mở, luôn cập nhật và phát triển.
+VietTap was named "Gõ Tiếng Việt" up to version 1.2.
 
-### Mã nguồn của ứng dụng được mở công khai, minh bạch dưới giấy phép GPL. Điều này nghĩa là bạn hoàn toàn có thể tải mã nguồn về tự build, cải tiến theo mục đích của bạn. Nếu bạn tái phân phối bản cải tiến của bạn, thì nó cũng phải là mã nguồn mở và thông báo bản gốc là OpenKey.
+## Install
 
-### Lưu ý, khi sử dụng OpenKey, bạn nên tắt hẳn bộ gõ khác vì 2 chương trình bộ gõ sẽ xung đột nhau, dẫn đến thao tác không chính xác.
+1. Download `VietTap-<version>.zip` from the
+   [latest release](https://github.com/reichentine/VietTap/releases/latest).
+2. Unzip it and move `VietTap.app` to Applications.
+3. Open it, then grant the Accessibility permission when macOS asks
+   (see [Using a downloaded build](#using-a-downloaded-build)).
 
-![Giao diện](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-main-control.png "Main UI")
-![Giao diện](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-main-control-2.png "Main UI")
-![Giao diện](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-main-control-3.png "Main UI")
-![Menu](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-small-control.png "Menu bar")
-![Gõ tắt](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-macro.png "Macro")
-![Chuyển mã](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-convert-tool.png "ConvertTool")
+- **Menu bar only.** A `V` (Vietnamese) or `E` (English) icon. It is a template
+  image, so it follows light and dark mode. No Dock icon, no main window.
+- **Small menu.** Vietnamese on/off, Settings…, Quit.
+- **One small Settings window**, built with standard AppKit controls:
+  switch key, switch sound, spell check, remember the input for each app,
+  open at login.
+- **Switch sound.** The switch key plays the macOS "Tink" sound when
+  Vietnamese turns on and "Pop" when English turns on, at a soft volume.
+  The menu and the per-app memory change the input without a sound.
+- **Fixed choices.** Telex, Unicode, and OpenKey's browser autocomplete fixes.
+- **No helper apps, no update check, no network access, no storyboard.**
+  The whole app is about 400 KB.
 
-## Hỗ trợ kiểu gõ
-- Telex
-- VNI
-- Simple Telex
+## Differences from OpenKey 2.0.5
 
-## Bảng mã thông dụng:
-- Unicode (Unicode dựng sẵn).
-- TCVN3 (ABC).
-- VNI Windows.
-- Unicode Compound (Unicode tổ hợp).
-- Vietnamese Locale CP 1258.
-- ...
+The keyboard hook (`KeyHook.mm`) is OpenKey's `OpenKey.mm` with the UI links
+removed. The engine code and the way characters are sent are unchanged. The
+changes are about latency and robustness:
 
-## Tính năng:
-- **Modern orthography** (On/Off) - Đặt dấu oà, uý thay vì òa, úy.
-- **Quick Telex** (On/Off) - Gõ nhanh (cc=ch, gg=gi, kk=kh, nn=ng, qq=qu, pp=ph, tt=th).
-- **Grammar check** (On/Off) - Kiểm tra ngữ pháp.
-- **Spelling check** (On/Off) - Kiểm tra chính tả.
-- **Restore key if invalid word** (on/off) - Phục hồi phím với từ sai.
-- **Run on startup** (On/Off) - Chạy cùng macOS.
-- **Gray menu bar icon** (On/Off) - Biểu tượng xám trên thanh menu phù hợp với chế độ Dark mode.
-- **Switch input mode by shortcut key** - Đổi chế độ gõ bằng phím tắt tùy chọn.
-- **Autocorrect fixed** (On/Off) - Sửa lỗi autocorrect trên trình duyệt như Chrome, Safari, Firefox, Microsoft Excel.
-- **Underline issue fixed on macOS** (On/Off) - Sửa lỗi gạch chân trên macOS.
-- **Tạm tắt kiểm tra chính tả bằng phím Ctrl** (On/Off) (Bản 1.5 về sau).
-- **Tạm tắt OpenKey bằng phím Cmd/Alt** (On/Off) (Bản 2.0.1 về sau).
-- **Cho phép dùng f z w j làm phụ âm đầu** (On/Off) (Bản 1.5 về sau).
-- **Gõ tắt phụ âm đầu: f->ph, j->gi, w->qu** (On/Off) (Bản 1.6 về sau).
-- **Gõ tắt phụ âm cuối: g->ng, h->nh, k->ch** (On/Off) (Bản 1.6 về sau).
-- **Hiện biểu tượng trên thanh Dock** (On/Off) (Bản 2.0.1 về sau). Bấm vào icon trên thanh Dock sẽ mở nhanh Bảng điều khiển.
-- **Macro** - Tính năng gõ tắt vô cùng tiện lợi. Gõ tắt của macOS chỉ hỗ trợ 20 ký tự, còn OpenKey không giới hạn ký tự.
-- **Chuyển chế độ thông minh:** (On/Off) (Bản 1.2 về sau) - Bạn đang dùng chế độ gõ Tiếng Việt trên ứng dụng A, bạn chuyển qua ứng dụng B trước đó bạn dùng chế độ gõ Tiếng Anh, OpenKey sẽ tự động chuyển qua chế độ gõ Tiếng Anh cho bạn, khi bạn quay lại ứng dụng A, OpenKey tất nhiên sẽ chuyển lại chế độ gõ tiếng Việt, rất cơ động.
-- **Viết Hoa chữ cái đầu câu** (On/Off) (Bản 1.2 về sau) - Khi gõ văn bản dài, đôi khi bạn quên ghi hoa chữ cái đầu câu khi kết thúc một câu hoặc khi xuống hàng, tính năng này sẽ tự ghi hoa chữ cái đầu câu cho bạn, thật tuyệt vời.
-- **Chế độ “Gửi từng phím”:** (On/Off) (Bản 1.1 về sau) mặc định dùng kỹ thuật mới gửi dữ liệu 1 lần thay vì gửi nhiều lần cho chuỗi ký tự, nên nếu có ứng dụng nào không tương thích, hãy bật tính năng này lên, mặc định thì nên tắt vì kỹ thuật mới sẽ chạy nhanh hơn.
-- **Cập nhật tự động:** (Bản 1.3 về sau) tính năng hỗ trợ cập nhật phiên bản OpenKey mới nhất mỗi khi mở OpenKey hoặc tự check trong phần mục Giới thiệu.
-- **Công cụ chuyển mã:** (Bản 1.4 về sau) hỗ trợ chuyển mã qua lại văn bản, thích hợp cho việc chuyển đổi văn bản cũ viết bằng VNI, TCVN3 qua Unicode,... Hỗ trợ cấu hình phím tắt chuyển mã nhanh, bảng cấu hình tùy chọn chuyển mã.
-- **Tự ghi nhớ bảng mã theo ứng dụng:** (Bản 2.0.1 về sau) Phù hợp cho các bạn dùng Photoshop, CAD,... với các bảng mã VNI, TCVN3. OpenKey tự ghi nhớ ứng dụng nào dùng bảng mã nào để lần sau sử dụng Photoshop, CAD,... OpenKey có thể tự chuyển sang bảng mã đó.
-- ...
+- **The language switch does not block typing.** OpenKey's event tap runs on
+  the main thread, and macOS holds every later key until the callback returns.
+  OpenKey 2.0.5 did the full UI refresh in that callback on each switch,
+  including a `SMLoginItemSetEnabled` call (about 23 ms on an Apple Silicon
+  Mac). Here the switch only flips the engine state; saving and UI updates run
+  after the callback returns.
+- **The front app is cached** from `NSWorkspace` notifications instead of being
+  queried on every key.
+- **The autocomplete fix runs only where it is needed.** OpenKey types an
+  invisible character and one more Backspace on every rewrite, in every app,
+  to protect fields with inline autocomplete. Here only browsers and Spotlight
+  get it (a second, read-only event tap sees which app gets the keys, because
+  Spotlight never becomes the front app). In a test paragraph this cuts the
+  synthetic keys per rewrite from 9.1 to 5.1 in all other apps. Add an app
+  with `defaults write com.sonvu.viettap AutocompleteFixApps -array <bundle id>`.
+- **It pauses while a macOS input method is selected** (for example Apple's
+  Vietnamese input or a Japanese input), so that no key is converted twice.
+  Its gray icon then shows V if that input is Vietnamese, E otherwise. A
+  keyboard layout such as ABC turns it on again.
+- **The hook turns itself on again** when macOS turns it off (a slow callback
+  or secure text entry), and a check every 5 seconds catches the cases where
+  macOS does not tell the callback.
+- **No nested run loop.** OpenKey 2.0.5 started the tap with `CFRunLoopRun()`
+  inside a main-queue block, which blocked the main dispatch queue (upstream
+  fixed this in a582ac4).
+- **The tap is turned on again** when macOS disables it (timeout or secure input).
+- **Login item through `SMAppService`** (macOS 13+) instead of a helper app.
+- **Accessibility:** the app shows the macOS prompt and starts by itself as soon
+  as the permission is on, without a restart.
 
+## Requirements
 
-[Changelog](https://github.com/tuyenvm/OpenKey/blob/master/CHANGELOG.md)
+- macOS 13 or later, Apple Silicon (`arm64`).
+- Accessibility permission (System Settings › Privacy & Security › Accessibility).
 
-## Cài đặt:
-**Cài đặt thủ công:**  
-Tải bản OpenKey mới nhất từ [đây](https://github.com/tuyenvm/OpenKey/releases/latest), mở file `dmg` ra rồi kéo thả `OpenKey.app` vào thư mục `Application`.
+## Build
 
-**Cài bằng Homebrew:** (by nhymxu)  
-Nếu chưa cài Homebrew, mở terminal, nhập:
-```
-$ /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
+Only the Command Line Tools are needed (`xcode-select --install`); Xcode is not.
 
-Kiểm tra phiên bản OpenKey:
-```
-$ brew info --cask openkey
-```
-Gõ lệnh sau để homebrew tự cài OpenKey cho bạn:
-```
-$ brew install --cask openkey
-```
-
-Để update phiên bản mới nhất của OpenKey
-```
-$ brew upgrade --cask openkey
+```sh
+./build_viettap.sh
+open build/VietTap.app
 ```
 
-## Note - Lưu ý:
-OpenKey cần cấp quyền, vào *System Preferences -> Security & Privacy -> Accessibility*, kích hoạt `OpenKey.app`. **Không tắt nó khi đang dùng OpenKey**.
-![Guide](https://raw.githubusercontent.com/tuyenvm/tuyenvm.github.io/master/images/openkey-guide.png "Accessibility").
+The script compiles `Sources/VietTap` and the OpenKey engine
+(`Sources/OpenKey/engine`) with clang and builds the app bundle in `build/`.
+It signs the app with a code-signing identity named **"OpenKey Local Signing"**
+if your keychain has one, and ad hoc otherwise. With a stable identity, the
+Accessibility permission stays valid after a rebuild; with an ad hoc signature,
+you must grant it again after each build.
 
-## Tác giả
-- Mai Vũ Tuyên.
-- Mọi góp ý, gửi cho mình qua maivutuyen.91@gmail.com  
-- Fanpage: [https://www.facebook.com/OpenKeyVN](https://www.facebook.com/OpenKeyVN)
+`ICON=/path/to/AppIcon.icns ./build_viettap.sh` sets the app icon. Without
+it, the script uses OpenKey's icon from a reference OpenKey bundle if present.
 
-## Liên kết
-- [OpenKey cho Windows, xem chi tiết tại đây](https://github.com/tuyenvm/OpenKey/tree/master/Sources/OpenKey/win32)
-- [OpenKey cho Linux (đang phát triển)](https://github.com/tuyenvm/OpenKey/tree/master/Sources/OpenKey/linux)
-## Một điều nhỏ nhoi
-Đừng quên ủng hộ tác giả bằng cách mua ly cafe cho tác giả tỉnh ngủ nhé:  
-[Buy me a coffee ^^](https://tuyenvm.github.io/donate.html)  
-[Redbull cũng được ^^](https://paypal.me/tuyenmai)  
-Hoặc trực tiếp qua ví momo:   
-![Donate by momo](https://tuyenvm.github.io/images/momo.png "Momo").   
+## Using a downloaded build
 
-Cảm ơn các bạn rất nhiều.
+Release builds are not notarized. On the first open, macOS blocks the app:
+open System Settings › Privacy & Security and click **Open Anyway**. Then grant
+the Accessibility permission when asked.
+
+Do not run VietTap and another Vietnamese input app (OpenKey, EVKey,
+…) at the same time: each key would be converted twice.
+
+## Settings storage
+
+Preferences are in the `com.sonvu.viettap` defaults domain. On the first
+launch, the app copies the switch key, spell check, smart switch and per-app
+languages from OpenKey (`com.tuyenmai.openkey`) if they exist.
+
+## License
+
+GPL-3.0, the same as OpenKey (see `LICENSE` at the repository root).
+The OpenKey engine and the keyboard hook code are © Tuyen Mai and the OpenKey
+contributors.

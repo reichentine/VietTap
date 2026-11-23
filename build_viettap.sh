@@ -1,19 +1,19 @@
 #!/bin/bash
-# Build Gõ Tiếng Việt (GoTiengViet.app) with the Command Line Tools only.
-# Sources: Sources/GoTiengViet (app) + Sources/OpenKey/engine (OpenKey engine).
+# Build VietTap (VietTap.app) with the Command Line Tools only.
+# Sources: Sources/VietTap (app) + Sources/OpenKey/engine (OpenKey engine).
 # All UI is built in code, so no storyboard, ibtool or Xcode is needed.
 #
-# Usage: ./build_gotiengviet.sh
-# Output: build/GoTiengViet.app (arm64)
+# Usage: ./build_viettap.sh
+# Output: build/VietTap.app (arm64)
 set -euo pipefail
 shopt -s nullglob # a source folder may have no .cpp or .m files
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 ENGINE="$ROOT/Sources/OpenKey/engine"
-SRC="$ROOT/Sources/GoTiengViet"
+SRC="$ROOT/Sources/VietTap"
 OUT="$ROOT/build"
-OBJ="$OUT/obj-gotiengviet"
-APP="$OUT/GoTiengViet.app"
+OBJ="$OUT/obj-viettap"
+APP="$OUT/VietTap.app"
 # App icon: OpenKey's icon from the reference bundle, unless ICON is given.
 ICON="${ICON:-$OUT/OpenKey-2.0.5-original.app/Contents/Resources/Icon.icns}"
 
@@ -41,11 +41,11 @@ done
 
 clang++ -arch arm64 -mmacosx-version-min=13.0 -fobjc-arc -stdlib=libc++ "$OBJ"/*.o \
   -framework Cocoa -framework Carbon -framework ApplicationServices -framework ServiceManagement \
-  -o "$OBJ/GoTiengViet"
+  -o "$OBJ/VietTap"
 
 # Bundle.
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$OBJ/GoTiengViet" "$APP/Contents/MacOS/GoTiengViet"
+cp "$OBJ/VietTap" "$APP/Contents/MacOS/VietTap"
 cp "$SRC/Info.plist" "$APP/Contents/Info.plist"
 plutil -lint -s "$APP/Contents/Info.plist"
 if [ -f "$ICON" ]; then

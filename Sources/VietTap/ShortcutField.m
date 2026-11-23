@@ -1,17 +1,17 @@
 //
 //  ShortcutField.m
-//  Gõ Tiếng Việt
+//  VietTap
 //
 
 #import "ShortcutField.h"
-#import "GTVHook.h"
+#import "VTHook.h"
 #import <Carbon/Carbon.h>
 
 static const NSEventModifierFlags kRecordedModifiers =
     NSEventModifierFlagControl | NSEventModifierFlagOption |
     NSEventModifierFlagShift | NSEventModifierFlagCommand;
 
-@implementation GTVShortcutField {
+@implementation VTShortcutField {
     id _monitor;
     BOOL _recording;
     NSEventModifierFlags _peakModifiers;
@@ -53,7 +53,7 @@ static const NSEventModifierFlags kRecordedModifiers =
 - (void)setHotKey:(int)hotKey {
     _hotKey = hotKey;
     if (!_recording)
-        self.title = [GTVShortcutField displayStringForHotKey:hotKey];
+        self.title = [VTShortcutField displayStringForHotKey:hotKey];
 }
 
 - (void)toggleRecording:(id)sender {
@@ -67,8 +67,8 @@ static const NSEventModifierFlags kRecordedModifiers =
     _recording = YES;
     _peakModifiers = 0;
     self.title = @"Type shortcut…";
-    GTVHookSetPaused(YES); // keep the current shortcut from switching meanwhile
-    __weak GTVShortcutField *weakSelf = self;
+    VTHookSetPaused(YES); // keep the current shortcut from switching meanwhile
+    __weak VTShortcutField *weakSelf = self;
     _monitor = [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskFlagsChanged)
                                                      handler:^NSEvent *(NSEvent *event) {
         return [weakSelf handleRecordingEvent:event];
@@ -86,8 +86,8 @@ static const NSEventModifierFlags kRecordedModifiers =
         _monitor = nil;
     }
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidResignKeyNotification object:nil];
-    GTVHookSetPaused(NO);
-    self.title = [GTVShortcutField displayStringForHotKey:_hotKey];
+    VTHookSetPaused(NO);
+    self.title = [VTShortcutField displayStringForHotKey:_hotKey];
 }
 
 - (void)windowDidResignKey:(NSNotification *)note {

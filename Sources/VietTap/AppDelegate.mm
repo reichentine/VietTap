@@ -1,6 +1,6 @@
 //
 //  AppDelegate.mm
-//  Gõ Tiếng Việt
+//  VietTap
 //
 //  Menu bar icon, menu, Settings window, Accessibility onboarding and the
 //  login item. All UI is built in code with standard AppKit controls, so it
@@ -12,17 +12,17 @@
 #import <Carbon/Carbon.h>
 #import <ServiceManagement/ServiceManagement.h>
 #import <os/log.h>
-#import "GTVHook.h"
+#import "VTHook.h"
 #import "ShortcutField.h"
 #import "SwitchSound.h"
 
-static NSString *const kAppName = @"Gõ Tiếng Việt";
+static NSString *const kAppName = @"VietTap";
 static NSString *const kImportedOpenKey = @"ImportedOpenKeySettings";
 
 // Menu bar icon: "V" in a filled rounded square (Vietnamese) or "E" in an
 // outlined one (English). Template images: macOS colors them for the menu
 // bar in light and dark mode.
-static NSImage *GTVStatusImage(BOOL vietnamese) {
+static NSImage *VTStatusImage(BOOL vietnamese) {
     NSImage *image = [NSImage imageWithSize:NSMakeSize(19, 15) flipped:NO drawingHandler:^BOOL(NSRect rect) {
         CGContextRef ctx = [NSGraphicsContext currentContext].CGContext;
         NSRect box = NSInsetRect(rect, 1.5, 1.0);
@@ -52,13 +52,13 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     return image;
 }
 
-@implementation GTVAppDelegate {
+@implementation VTAppDelegate {
     NSStatusItem *_statusItem;
     NSMenuItem *_languageItem;
     NSMenuItem *_permissionItem;
     NSMenuItem *_permissionSeparator;
     NSWindow *_settingsWindow;
-    GTVShortcutField *_shortcutField;
+    VTShortcutField *_shortcutField;
     NSButton *_soundBox;
     NSButton *_spellingBox;
     NSButton *_smartSwitchBox;
@@ -76,14 +76,14 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     [self buildMainMenu];
     [self buildStatusItem];
 
-    GTVEngineInit();
-    __weak GTVAppDelegate *weakSelf = self;
-    GTVSetLanguageObserver(^{ [weakSelf updateLanguageUI]; });
+    VTEngineInit();
+    __weak VTAppDelegate *weakSelf = self;
+    VTSetLanguageObserver(^{ [weakSelf updateLanguageUI]; });
 
-    [GTVSwitchSound prepare];
-    GTVSetHotKeySwitchObserver(^(int language) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:GTVPrefSwitchSound])
-            [GTVSwitchSound playForLanguage:language];
+    [VTSwitchSound prepare];
+    VTSetHotKeySwitchObserver(^(int language) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:VTPrefSwitchSound])
+            [VTSwitchSound playForLanguage:language];
     });
 
     [self observeWorkspace];
@@ -100,12 +100,12 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 
 - (void)registerDefaults {
     [[NSUserDefaults standardUserDefaults] registerDefaults:@{
-        GTVPrefLanguage: @1,
-        GTVPrefSwitchKey: @(GTVHotKeyControlShift),
-        GTVPrefSpelling: @YES,
-        GTVPrefSmartSwitch: @YES,
-        GTVPrefOpenAtLogin: @YES,
-        GTVPrefSwitchSound: @YES,
+        VTPrefLanguage: @1,
+        VTPrefSwitchKey: @(VTHotKeyControlShift),
+        VTPrefSpelling: @YES,
+        VTPrefSmartSwitch: @YES,
+        VTPrefOpenAtLogin: @YES,
+        VTPrefSwitchSound: @YES,
     }];
 }
 
@@ -117,8 +117,8 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
         return;
     [prefs setBool:YES forKey:kImportedOpenKey];
     NSUserDefaults *openKey = [[NSUserDefaults alloc] initWithSuiteName:@"com.tuyenmai.openkey"];
-    for (NSString *key in @[GTVPrefLanguage, GTVPrefSwitchKey, GTVPrefSpelling,
-                            GTVPrefSmartSwitch, GTVPrefSmartData]) {
+    for (NSString *key in @[VTPrefLanguage, VTPrefSwitchKey, VTPrefSpelling,
+                            VTPrefSmartSwitch, VTPrefSmartData]) {
         id value = [openKey objectForKey:key];
         if (value != nil)
             [prefs setObject:value forKey:key];
@@ -126,16 +126,16 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 }
 
 - (void)startHook {
-    if (!GTVHookStart()) {
-        os_log(OS_LOG_DEFAULT, "GTV: event tap could not start, waiting for Accessibility");
+    if (!VTHookStart()) {
+        os_log(OS_LOG_DEFAULT, "VietTap: event tap could not start, waiting for Accessibility");
         [self askForAccessibility];
         return;
     }
-    os_log(OS_LOG_DEFAULT, "GTV: keyboard hook running");
+    os_log(OS_LOG_DEFAULT, "VietTap: keyboard hook running");
     static NSTimer *watchdog;
     [watchdog invalidate];
     watchdog = [NSTimer scheduledTimerWithTimeInterval:5.0 repeats:YES block:^(NSTimer *timer) {
-        GTVHookWatchdog();
+        VTHookWatchdog();
     }];
     watchdog.tolerance = 1.0;
     [self updateLanguageUI];
@@ -147,7 +147,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 // list), opens the Accessibility page, and starts the hook as soon as the
 // permission is on.
 - (void)askForAccessibility {
-    os_log(OS_LOG_DEFAULT, "GTV: Accessibility permission missing, opening System Settings");
+    os_log(OS_LOG_DEFAULT, "VietTap: Accessibility permission missing, opening System Settings");
     [self openAccessibilitySettings:nil];
 }
 
@@ -189,7 +189,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 
 - (void)buildStatusItem {
     _statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    _statusItem.button.image = GTVStatusImage(YES);
+    _statusItem.button.image = VTStatusImage(YES);
 
     NSMenu *menu = [[NSMenu alloc] init];
     menu.delegate = self;
@@ -218,12 +218,12 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 }
 
 - (void)updateLanguageUI {
-    BOOL running = GTVHookIsRunning();
-    BOOL paused = GTVHookIsInputSourcePaused();
-    BOOL vietnamese = GTVGetLanguage() == 1;
+    BOOL running = VTHookIsRunning();
+    BOOL paused = VTHookIsInputSourcePaused();
+    BOOL vietnamese = VTGetLanguage() == 1;
     // While paused, show the language of the selected input method, so that
     // typing Vietnamese with another input method does not show [E].
-    _statusItem.button.image = GTVStatusImage(paused ? _pausingSourceIsVietnamese : (vietnamese && running));
+    _statusItem.button.image = VTStatusImage(paused ? _pausingSourceIsVietnamese : (vietnamese && running));
     _statusItem.button.appearsDisabled = !running || paused;
     if (!running)
         _statusItem.button.toolTip = [NSString stringWithFormat:@"%@: needs Accessibility access", kAppName];
@@ -237,10 +237,10 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     _languageItem.enabled = running && !paused;
     _languageItem.state = vietnamese ? NSControlStateValueOn : NSControlStateValueOff;
     if (@available(macOS 14.4, *)) {
-        int hotKey = (int)[[NSUserDefaults standardUserDefaults] integerForKey:GTVPrefSwitchKey];
+        int hotKey = (int)[[NSUserDefaults standardUserDefaults] integerForKey:VTPrefSwitchKey];
         _languageItem.subtitle = paused
             ? [NSString stringWithFormat:@"Paused: %@ is selected", _pausingSourceName]
-            : [NSString stringWithFormat:@"Switch: %@", [GTVShortcutField displayStringForHotKey:hotKey]];
+            : [NSString stringWithFormat:@"Switch: %@", [VTShortcutField displayStringForHotKey:hotKey]];
     }
 }
 
@@ -262,7 +262,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     if (note != nil) {
         // The notice can come a moment before the new input is active (for
         // example from the input menu), so check again shortly after.
-        __weak GTVAppDelegate *weakSelf = self;
+        __weak VTAppDelegate *weakSelf = self;
         for (NSNumber *delay in @[@0.2, @1.0]) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{ [weakSelf checkInputSource]; });
@@ -283,20 +283,20 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
             _pausingSourceIsVietnamese = [sourceID hasSuffix:@".vi"];
         else
             _pausingSourceIsVietnamese = [languages.firstObject isEqual:@"vi"];
-        os_log_debug(OS_LOG_DEFAULT, "GTV: input source %{public}@, type %{public}@",
+        os_log_debug(OS_LOG_DEFAULT, "VietTap: input source %{public}@, type %{public}@",
                      (__bridge NSString *)TISGetInputSourceProperty(source, kTISPropertyInputSourceID),
                      (__bridge NSString *)type);
         CFRelease(source);
     }
-    if (isLayout == GTVHookIsInputSourcePaused())
-        os_log(OS_LOG_DEFAULT, "GTV: %{public}s (input source: %{public}@)",
+    if (isLayout == VTHookIsInputSourcePaused())
+        os_log(OS_LOG_DEFAULT, "VietTap: %{public}s (input source: %{public}@)",
                isLayout ? "resumed" : "paused", _pausingSourceName);
-    GTVHookSetInputSourcePaused(!isLayout);
+    VTHookSetInputSourcePaused(!isLayout);
     [self updateLanguageUI];
 }
 
 - (void)toggleLanguage:(id)sender {
-    GTVToggleLanguage();
+    VTToggleLanguage();
 }
 
 #pragma mark - Settings window
@@ -305,10 +305,10 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     if (_settingsWindow == nil)
         [self buildSettingsWindow];
     NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
-    _shortcutField.hotKey = (int)[prefs integerForKey:GTVPrefSwitchKey];
-    _soundBox.state = [prefs boolForKey:GTVPrefSwitchSound] ? NSControlStateValueOn : NSControlStateValueOff;
-    _spellingBox.state = [prefs boolForKey:GTVPrefSpelling] ? NSControlStateValueOn : NSControlStateValueOff;
-    _smartSwitchBox.state = [prefs boolForKey:GTVPrefSmartSwitch] ? NSControlStateValueOn : NSControlStateValueOff;
+    _shortcutField.hotKey = (int)[prefs integerForKey:VTPrefSwitchKey];
+    _soundBox.state = [prefs boolForKey:VTPrefSwitchSound] ? NSControlStateValueOn : NSControlStateValueOff;
+    _spellingBox.state = [prefs boolForKey:VTPrefSpelling] ? NSControlStateValueOn : NSControlStateValueOff;
+    _smartSwitchBox.state = [prefs boolForKey:VTPrefSmartSwitch] ? NSControlStateValueOn : NSControlStateValueOff;
     _openAtLoginBox.state = [self isOpenAtLoginEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
     [self activateApp];
     [_settingsWindow makeKeyAndOrderFront:nil];
@@ -316,11 +316,11 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 
 - (void)buildSettingsWindow {
     NSTextField *switchLabel = [NSTextField labelWithString:@"Switch input:"];
-    _shortcutField = [[GTVShortcutField alloc] init];
+    _shortcutField = [[VTShortcutField alloc] init];
     [_shortcutField.widthAnchor constraintGreaterThanOrEqualToConstant:110].active = YES;
-    __weak GTVAppDelegate *weakSelf = self;
+    __weak VTAppDelegate *weakSelf = self;
     _shortcutField.onChange = ^(int hotKey) {
-        GTVSetSwitchKey(hotKey);
+        VTSetSwitchKey(hotKey);
         [weakSelf updateLanguageUI];
     };
 
@@ -375,22 +375,22 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
 
 - (void)soundChanged:(NSButton *)sender {
     BOOL on = sender.state == NSControlStateValueOn;
-    [[NSUserDefaults standardUserDefaults] setBool:on forKey:GTVPrefSwitchSound];
+    [[NSUserDefaults standardUserDefaults] setBool:on forKey:VTPrefSwitchSound];
     if (on)
-        [GTVSwitchSound playForLanguage:GTVGetLanguage()]; // a sample
+        [VTSwitchSound playForLanguage:VTGetLanguage()]; // a sample
 }
 
 - (void)spellingChanged:(NSButton *)sender {
-    GTVSetSpelling(sender.state == NSControlStateValueOn);
+    VTSetSpelling(sender.state == NSControlStateValueOn);
 }
 
 - (void)smartSwitchChanged:(NSButton *)sender {
-    GTVSetSmartSwitch(sender.state == NSControlStateValueOn);
+    VTSetSmartSwitch(sender.state == NSControlStateValueOn);
 }
 
 - (void)openAtLoginChanged:(NSButton *)sender {
     BOOL on = sender.state == NSControlStateValueOn;
-    [[NSUserDefaults standardUserDefaults] setBool:on forKey:GTVPrefOpenAtLogin];
+    [[NSUserDefaults standardUserDefaults] setBool:on forKey:VTPrefOpenAtLogin];
     [self setOpenAtLogin:on];
     sender.state = [self isOpenAtLoginEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
 }
@@ -417,7 +417,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     // item is not there yet ("not registered", or "not found" for a new app);
     // remove the item when it is off. If the user turned the item off in
     // System Settings, the status is "requires approval" and stays so.
-    BOOL wanted = [[NSUserDefaults standardUserDefaults] boolForKey:GTVPrefOpenAtLogin];
+    BOOL wanted = [[NSUserDefaults standardUserDefaults] boolForKey:VTPrefOpenAtLogin];
     SMAppServiceStatus status = SMAppService.mainAppService.status;
     if (wanted && status != SMAppServiceStatusEnabled && status != SMAppServiceStatusRequiresApproval)
         [self setOpenAtLogin:YES];
@@ -432,18 +432,18 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     [center addObserverForName:NSWorkspaceDidActivateApplicationNotification object:nil queue:nil
                     usingBlock:^(NSNotification *note) {
         NSRunningApplication *app = note.userInfo[NSWorkspaceApplicationKey];
-        GTVActiveAppChanged(app.bundleIdentifier);
+        VTActiveAppChanged(app.bundleIdentifier);
     }];
     [center addObserverForName:NSWorkspaceActiveSpaceDidChangeNotification object:nil queue:nil
                     usingBlock:^(NSNotification *note) {
-        GTVRequestNewSession();
+        VTRequestNewSession();
     }];
-    __weak GTVAppDelegate *weakSelf = self;
+    __weak VTAppDelegate *weakSelf = self;
     [center addObserverForName:NSWorkspaceDidWakeNotification object:nil queue:nil
                     usingBlock:^(NSNotification *note) {
         // Create the tap again after sleep, as OpenKey did.
         if (AXIsProcessTrusted()) {
-            GTVHookStop();
+            VTHookStop();
             [weakSelf startHook];
         }
     }];

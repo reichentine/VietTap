@@ -1,6 +1,6 @@
 //
 //  KeyHook.mm
-//  Gõ Tiếng Việt
+//  VietTap
 //
 //  The keyboard hook. Adapted from OpenKey's OpenKey.mm (Tuyen Mai, GPL-3.0).
 //  The code that talks to the engine and sends characters is unchanged.
@@ -18,7 +18,7 @@
 #import <Cocoa/Cocoa.h>
 #import <os/log.h>
 #import "Engine.h"
-#import "GTVHook.h"
+#import "VTHook.h"
 
 #define OTHER_CONTROL_KEY (_flag & kCGEventFlagMaskCommand) || (_flag & kCGEventFlagMaskControl) || \
                             (_flag & kCGEventFlagMaskAlternate) || (_flag & kCGEventFlagMaskSecondaryFn) || \
@@ -39,7 +39,7 @@ int vCodeTable = 0;               // Unicode (fixed)
 int vCheckSpelling = 1;           // Settings
 int vUseModernOrthography = 0;
 int vQuickTelex = 0;
-int vSwitchKeyStatus = GTVHotKeyControlShift; // Settings
+int vSwitchKeyStatus = VTHotKeyControlShift; // Settings
 int vRestoreIfWrongSpelling = 0;  // off: a wrong word stays visible, as a sign to switch input
 int vFixRecommendBrowser = 1;     // autocomplete fix, only in the apps of _autocompleteApps
 int vUseMacro = 0;
@@ -74,9 +74,9 @@ static NSString *_ownBundleID = nil;
 // invisible character first (or, in Chromium browsers, select one letter
 // with Shift+Left). OpenKey applied it in every app; here only the apps that
 // have such fields get it, so other apps get fewer synthetic keys.
-// Extra apps: defaults write com.sonvu.gotiengviet AutocompleteFixApps -array <bundle id> ...
+// Extra apps: defaults write com.sonvu.viettap AutocompleteFixApps -array <bundle id> ...
 // ---------------------------------------------------------------------------
-enum { GTVFixNone = 0, GTVFixInvisibleChar = 1, GTVFixSelectLeft = 2 };
+enum { VTFixNone = 0, VTFixInvisibleChar = 1, VTFixSelectLeft = 2 };
 
 // OpenKey's Chromium list (exact match): Shift+Left instead of the invisible character.
 static NSArray *_selectLeftApps = @[@"com.google.Chrome", @"com.brave.Browser",
@@ -95,17 +95,17 @@ static NSArray *_autocompleteApps = @[
 ];
 static NSArray *_extraAutocompleteApps = @[];
 
-static int _targetFix = GTVFixNone;   // fix mode of the app that gets the keys
+static int _targetFix = VTFixNone;   // fix mode of the app that gets the keys
 static pid_t _targetPid = 0;
 
 static int fixModeForApp(NSString *bundleID) {
     if (bundleID == nil)
-        return GTVFixNone;
+        return VTFixNone;
     if ([_selectLeftApps containsObject:bundleID])
-        return GTVFixSelectLeft;
+        return VTFixSelectLeft;
     if ([_autocompleteApps containsObject:bundleID] || [_extraAutocompleteApps containsObject:bundleID])
-        return GTVFixInvisibleChar;
-    return GTVFixNone;
+        return VTFixInvisibleChar;
+    return VTFixNone;
 }
 
 extern "C" {
@@ -145,10 +145,10 @@ extern "C" {
     vector<Byte> savedSmartSwitchKeyData; ////use for smart switch key
 
     // Bundle ID of the frontmost app other than this one. Updated by
-    // GTVActiveAppChanged; read on every key.
+    // VTActiveAppChanged; read on every key.
     NSString* _frontMostApp = @"UnknownApp";
 
-    void GTVEngineInit() {
+    void VTEngineInit() {
         NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
         _ownBundleID = [[NSBundle mainBundle] bundleIdentifier];
         NSString *front = [[NSWorkspace sharedWorkspace] frontmostApplication].bundleIdentifier;
@@ -159,12 +159,12 @@ extern "C" {
             _extraAutocompleteApps = extra;
         _targetFix = fixModeForApp(_frontMostApp);
 
-        vLanguage = (int)[prefs integerForKey:GTVPrefLanguage] ? 1 : 0;
-        vSwitchKeyStatus = (int)[prefs integerForKey:GTVPrefSwitchKey];
+        vLanguage = (int)[prefs integerForKey:VTPrefLanguage] ? 1 : 0;
+        vSwitchKeyStatus = (int)[prefs integerForKey:VTPrefSwitchKey];
         if (vSwitchKeyStatus == 0)
-            vSwitchKeyStatus = GTVHotKeyControlShift;
-        vCheckSpelling = [prefs boolForKey:GTVPrefSpelling] ? 1 : 0;
-        vUseSmartSwitchKey = [prefs boolForKey:GTVPrefSmartSwitch] ? 1 : 0;
+            vSwitchKeyStatus = VTHotKeyControlShift;
+        vCheckSpelling = [prefs boolForKey:VTPrefSpelling] ? 1 : 0;
+        vUseSmartSwitchKey = [prefs boolForKey:VTPrefSmartSwitch] ? 1 : 0;
 
         myEventSource = CGEventSourceCreate(kCGEventSourceStatePrivate);
         pData = (vKeyHookState*)vKeyInit();
@@ -176,7 +176,7 @@ extern "C" {
         initMacroMap(NULL, 0);
 
         //init and load smart switch key data
-        NSData *data = [prefs objectForKey:GTVPrefSmartData];
+        NSData *data = [prefs objectForKey:VTPrefSmartData];
         initSmartSwitchKey((Byte*)data.bytes, (int)data.length);
 
         vSetCheckSpelling();
@@ -191,7 +191,7 @@ extern "C" {
         }
     }
 
-    void GTVRequestNewSession() {
+    void VTRequestNewSession() {
         RequestNewSession();
     }
 
@@ -207,7 +207,7 @@ extern "C" {
     void saveSmartSwitchKeyData() {
         getSmartSwitchKeySaveData(savedSmartSwitchKeyData);
         NSData* _data = [NSData dataWithBytes:savedSmartSwitchKeyData.data() length:savedSmartSwitchKeyData.size()];
-        [[NSUserDefaults standardUserDefaults] setObject:_data forKey:GTVPrefSmartData];
+        [[NSUserDefaults standardUserDefaults] setObject:_data forKey:VTPrefSmartData];
     }
 
     static void notifyLanguageObserver() {
@@ -217,7 +217,7 @@ extern "C" {
 
     // Saves the language for the current app (smart switch) and tells the UI.
     static void languageDidChange() {
-        [[NSUserDefaults standardUserDefaults] setInteger:vLanguage forKey:GTVPrefLanguage];
+        [[NSUserDefaults standardUserDefaults] setInteger:vLanguage forKey:VTPrefLanguage];
         if (vUseSmartSwitchKey) {
             setAppInputMethodStatus(string(_frontMostApp.UTF8String), vLanguage | (vCodeTable << 1));
             saveSmartSwitchKeyData();
@@ -225,7 +225,7 @@ extern "C" {
         notifyLanguageObserver();
     }
 
-    void GTVActiveAppChanged(NSString *bundleID) {
+    void VTActiveAppChanged(NSString *bundleID) {
         if (bundleID == nil || [bundleID isEqualToString:_ownBundleID])
             return; // keep the last real app while Settings is in front
         _frontMostApp = bundleID;
@@ -242,7 +242,7 @@ extern "C" {
         }
         if ((_languageTemp & 0x01) != vLanguage) {
             vLanguage = _languageTemp & 0x01;
-            [[NSUserDefaults standardUserDefaults] setInteger:vLanguage forKey:GTVPrefLanguage];
+            [[NSUserDefaults standardUserDefaults] setInteger:vLanguage forKey:VTPrefLanguage];
             startNewSession();
             notifyLanguageObserver();
         }
@@ -528,44 +528,44 @@ extern "C" {
 
     void switchLanguage() {
         vLanguage = (vLanguage == 0) ? 1 : 0;
-        os_log(OS_LOG_DEFAULT, "GTV: switch key, language %d", vLanguage);
+        os_log(OS_LOG_DEFAULT, "VietTap: switch key, language %d", vLanguage);
         startNewSession();
         scheduleLanguageDidChange();
     }
 
-    void GTVSetHotKeySwitchObserver(void (^observer)(int language)) {
+    void VTSetHotKeySwitchObserver(void (^observer)(int language)) {
         _hotKeySwitchObserver = [observer copy];
     }
 
-    int GTVGetLanguage() {
+    int VTGetLanguage() {
         return vLanguage;
     }
 
-    void GTVToggleLanguage() {
+    void VTToggleLanguage() {
         vLanguage = (vLanguage == 0) ? 1 : 0;
         startNewSession();
         languageDidChange();
     }
 
-    void GTVSetLanguageObserver(void (^observer)(void)) {
+    void VTSetLanguageObserver(void (^observer)(void)) {
         _languageObserver = [observer copy];
     }
 
-    void GTVSetSwitchKey(int hotKey) {
+    void VTSetSwitchKey(int hotKey) {
         vSwitchKeyStatus = hotKey;
         _lastFlag = 0;
-        [[NSUserDefaults standardUserDefaults] setInteger:hotKey forKey:GTVPrefSwitchKey];
+        [[NSUserDefaults standardUserDefaults] setInteger:hotKey forKey:VTPrefSwitchKey];
     }
 
-    void GTVSetSpelling(BOOL on) {
+    void VTSetSpelling(BOOL on) {
         vCheckSpelling = on ? 1 : 0;
         vSetCheckSpelling();
-        [[NSUserDefaults standardUserDefaults] setBool:on forKey:GTVPrefSpelling];
+        [[NSUserDefaults standardUserDefaults] setBool:on forKey:VTPrefSpelling];
     }
 
-    void GTVSetSmartSwitch(BOOL on) {
+    void VTSetSmartSwitch(BOOL on) {
         vUseSmartSwitchKey = on ? 1 : 0;
-        [[NSUserDefaults standardUserDefaults] setBool:on forKey:GTVPrefSmartSwitch];
+        [[NSUserDefaults standardUserDefaults] setBool:on forKey:VTPrefSmartSwitch];
     }
 
     void handleMacro() {
@@ -604,7 +604,7 @@ extern "C" {
         // macOS turns the tap off when a callback is too slow or when secure
         // input starts; turn it on again.
         if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
-            os_log(OS_LOG_DEFAULT, "GTV: macOS turned the hook off (%{public}s), turning it on",
+            os_log(OS_LOG_DEFAULT, "VietTap: macOS turned the hook off (%{public}s), turning it on",
                    type == kCGEventTapDisabledByTimeout ? "timeout" : "user input");
             if (_eventTap != NULL)
                 CGEventTapEnable(_eventTap, true);
@@ -700,8 +700,8 @@ extern "C" {
             } else if (pData->code == vWillProcess || pData->code == vRestore || pData->code == vRestoreAndStartNewSession) { //handle result signal
 
                 //fix autocomplete (only in apps with inline autocomplete)
-                if (vFixRecommendBrowser && _targetFix != GTVFixNone && pData->extCode != 4) {
-                    if (vFixChromiumBrowser && _targetFix == GTVFixSelectLeft) {
+                if (vFixRecommendBrowser && _targetFix != VTFixNone && pData->extCode != 4) {
+                    if (vFixChromiumBrowser && _targetFix == VTFixSelectLeft) {
                         if (pData->backspaceCount > 0) {
                             SendShiftAndLeftArrow();
                             if (pData->backspaceCount == 1)
@@ -763,7 +763,7 @@ extern "C" {
             NSString *bundleID = [NSRunningApplication runningApplicationWithProcessIdentifier:pid].bundleIdentifier;
             int mode = fixModeForApp(bundleID);
             if (mode != _targetFix)
-                os_log(OS_LOG_DEFAULT, "GTV: keys go to %{public}@, autocomplete fix %d", bundleID, mode);
+                os_log(OS_LOG_DEFAULT, "VietTap: keys go to %{public}@, autocomplete fix %d", bundleID, mode);
             _targetFix = mode;
         }
         return event;
@@ -777,7 +777,7 @@ extern "C" {
                                       TargetCallback,
                                       NULL);
         if (_targetTap == NULL) {
-            os_log(OS_LOG_DEFAULT, "GTV: target tap not available, using the front app only");
+            os_log(OS_LOG_DEFAULT, "VietTap: target tap not available, using the front app only");
             return;
         }
         _targetRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, _targetTap, 0);
@@ -797,7 +797,7 @@ extern "C" {
         _targetTap = NULL;
     }
 
-    BOOL GTVHookStart() {
+    BOOL VTHookStart() {
         if (_eventTap != NULL)
             return YES;
         CGEventMask eventMask = ((1 << kCGEventKeyDown) |
@@ -823,7 +823,7 @@ extern "C" {
         return YES;
     }
 
-    void GTVHookStop() {
+    void VTHookStop() {
         stopTargetTap();
         if (_eventTap == NULL)
             return;
@@ -836,22 +836,22 @@ extern "C" {
         _eventTap = NULL;
     }
 
-    BOOL GTVHookIsRunning() {
+    BOOL VTHookIsRunning() {
         return _eventTap != NULL && CGEventTapIsEnabled(_eventTap);
     }
     
     // Turns the taps on again if macOS turned them off without telling the
     // callback. Called every few seconds by the app.
-    void GTVHookWatchdog() {
+    void VTHookWatchdog() {
         if (_eventTap != NULL && !CGEventTapIsEnabled(_eventTap)) {
-            os_log(OS_LOG_DEFAULT, "GTV: watchdog found the hook off, turning it on");
+            os_log(OS_LOG_DEFAULT, "VietTap: watchdog found the hook off, turning it on");
             CGEventTapEnable(_eventTap, true);
         }
         if (_targetTap != NULL && !CGEventTapIsEnabled(_targetTap))
             CGEventTapEnable(_targetTap, true);
     }
 
-    void GTVHookSetInputSourcePaused(BOOL paused) {
+    void VTHookSetInputSourcePaused(BOOL paused) {
         if (paused == _sourcePaused)
             return;
         _sourcePaused = paused;
@@ -859,11 +859,11 @@ extern "C" {
         startNewSession();
     }
 
-    BOOL GTVHookIsInputSourcePaused() {
+    BOOL VTHookIsInputSourcePaused() {
         return _sourcePaused;
     }
 
-    void GTVHookSetPaused(BOOL paused) {
+    void VTHookSetPaused(BOOL paused) {
         _paused = paused;
         _lastFlag = 0;
         if (!paused)
