@@ -13,6 +13,7 @@
 #import <os/log.h>
 #import "GTVHook.h"
 #import "ShortcutField.h"
+#import "SwitchSound.h"
 
 static NSString *const kAppName = @"Gõ Tiếng Việt";
 static NSString *const kImportedOpenKey = @"ImportedOpenKeySettings";
@@ -57,6 +58,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     NSMenuItem *_permissionSeparator;
     NSWindow *_settingsWindow;
     GTVShortcutField *_shortcutField;
+    NSButton *_soundBox;
     NSButton *_spellingBox;
     NSButton *_smartSwitchBox;
     NSButton *_openAtLoginBox;
@@ -74,6 +76,12 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     GTVEngineInit();
     __weak GTVAppDelegate *weakSelf = self;
     GTVSetLanguageObserver(^{ [weakSelf updateLanguageUI]; });
+
+    [GTVSwitchSound prepare];
+    GTVSetHotKeySwitchObserver(^(int language) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:GTVPrefSwitchSound])
+            [GTVSwitchSound playForLanguage:language];
+    });
 
     [self observeWorkspace];
     [self applyOpenAtLoginPreference];
@@ -93,6 +101,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
         GTVPrefSpelling: @YES,
         GTVPrefSmartSwitch: @YES,
         GTVPrefOpenAtLogin: @YES,
+        GTVPrefSwitchSound: @YES,
     }];
 }
 
@@ -228,6 +237,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
         [self buildSettingsWindow];
     NSUserDefaults *prefs = [NSUserDefaults standardUserDefaults];
     _shortcutField.hotKey = (int)[prefs integerForKey:GTVPrefSwitchKey];
+    _soundBox.state = [prefs boolForKey:GTVPrefSwitchSound] ? NSControlStateValueOn : NSControlStateValueOff;
     _spellingBox.state = [prefs boolForKey:GTVPrefSpelling] ? NSControlStateValueOn : NSControlStateValueOff;
     _smartSwitchBox.state = [prefs boolForKey:GTVPrefSmartSwitch] ? NSControlStateValueOn : NSControlStateValueOff;
     _openAtLoginBox.state = [self isOpenAtLoginEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
@@ -245,6 +255,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
         [weakSelf updateLanguageUI];
     };
 
+    _soundBox = [NSButton checkboxWithTitle:@"Play a sound when switching" target:self action:@selector(soundChanged:)];
     _spellingBox = [NSButton checkboxWithTitle:@"Check spelling" target:self action:@selector(spellingChanged:)];
     _smartSwitchBox = [NSButton checkboxWithTitle:@"Remember the input for each app"
                                            target:self action:@selector(smartSwitchChanged:)];
@@ -257,6 +268,7 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     NSView *empty = NSGridCell.emptyContentView;
     NSGridView *grid = [NSGridView gridViewWithViews:@[
         @[switchLabel, _shortcutField],
+        @[empty, _soundBox],
         @[empty, _spellingBox],
         @[empty, _smartSwitchBox],
         @[empty, _openAtLoginBox],
@@ -267,8 +279,8 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     grid.rowAlignment = NSGridRowAlignmentFirstBaseline;
     [grid columnAtIndex:0].xPlacement = NSGridCellPlacementTrailing;
     [grid columnAtIndex:1].xPlacement = NSGridCellPlacementLeading;
-    [grid rowAtIndex:0].bottomPadding = 6;
-    [grid rowAtIndex:4].topPadding = 4;
+    [grid rowAtIndex:1].bottomPadding = 6; // switch key + its sound, then the rest
+    [grid rowAtIndex:5].topPadding = 4;
     grid.translatesAutoresizingMaskIntoConstraints = NO;
 
     NSView *content = [[NSView alloc] init];
@@ -290,6 +302,13 @@ static NSImage *GTVStatusImage(BOOL vietnamese) {
     [content layoutSubtreeIfNeeded];
     [_settingsWindow setContentSize:content.fittingSize];
     [_settingsWindow center];
+}
+
+- (void)soundChanged:(NSButton *)sender {
+    BOOL on = sender.state == NSControlStateValueOn;
+    [[NSUserDefaults standardUserDefaults] setBool:on forKey:GTVPrefSwitchSound];
+    if (on)
+        [GTVSwitchSound playForLanguage:GTVGetLanguage()]; // a sample
 }
 
 - (void)spellingChanged:(NSButton *)sender {

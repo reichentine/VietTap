@@ -18,6 +18,7 @@
 #define GTVPrefSmartSwitch   @"UseSmartSwitchKey" // remember language per app
 #define GTVPrefOpenAtLogin   @"RunOnStartup"
 #define GTVPrefSmartData     @"smartSwitchKey"    // per-app data blob
+#define GTVPrefSwitchSound   @"PlaySwitchSound"   // chime on the switch key
 
 // OpenKey hotkey format: bits 0-7 key code (0xFE = modifiers only),
 // 0x100 Control, 0x200 Option, 0x400 Command, 0x800 Shift, 0x8000 beep,
@@ -46,6 +47,11 @@ void GTVToggleLanguage(void);
 /// Called after every language change (hotkey, menu, or smart switch),
 /// after the event tap callback has returned.
 void GTVSetLanguageObserver(void (^observer)(void));
+
+/// Called only when the switch key changed the language (not the menu and
+/// not the per-app memory), right after the event tap callback returns.
+/// language: the new language.
+void GTVSetHotKeySwitchObserver(void (^observer)(int language));
 
 /// Settings changed in the Settings window.
 void GTVSetSwitchKey(int hotKey);

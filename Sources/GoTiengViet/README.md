@@ -8,7 +8,11 @@ unchanged, with a much smaller app around it.
   image, so it follows light and dark mode. No Dock icon, no main window.
 - **Small menu.** Vietnamese on/off, Settings…, Quit.
 - **One small Settings window**, built with standard AppKit controls:
-  switch key, spell check, remember the input for each app, open at login.
+  switch key, switch sound, spell check, remember the input for each app,
+  open at login.
+- **Switch sound.** The switch key plays the macOS "Tink" sound when
+  Vietnamese turns on and "Pop" when English turns on, at a soft volume.
+  The menu and the per-app memory change the input without a sound.
 - **Fixed choices.** Telex, Unicode, and OpenKey's browser autocomplete fixes.
 - **No helper apps, no update check, no network access, no storyboard.**
   The whole app is about 400 KB.

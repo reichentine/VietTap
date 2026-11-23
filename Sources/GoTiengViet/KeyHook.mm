@@ -453,17 +453,21 @@ extern "C" {
     }
 
     static bool _languageUISyncPending = false;
+    static void (^_hotKeySwitchObserver)(int) = nil;
 
     // The event tap callback runs on the main thread, and macOS holds every
     // later key event until it returns. So the hotkey path only flips the
-    // engine state; saving and the UI run right after the callback returns.
-    // Several switches before that collapse into one update.
+    // engine state; the sound, saving and the UI run right after the
+    // callback returns. Several switches before that collapse into one
+    // update with the final language.
     static void scheduleLanguageDidChange() {
         if (_languageUISyncPending)
             return;
         _languageUISyncPending = true;
         dispatch_async(dispatch_get_main_queue(), ^{
             _languageUISyncPending = false;
+            if (_hotKeySwitchObserver)
+                _hotKeySwitchObserver(vLanguage); // sound first: least delay
             languageDidChange();
         });
     }
@@ -471,9 +475,11 @@ extern "C" {
     void switchLanguage() {
         vLanguage = (vLanguage == 0) ? 1 : 0;
         startNewSession();
-        if (HAS_BEEP(vSwitchKeyStatus))
-            NSBeep();
         scheduleLanguageDidChange();
+    }
+
+    void GTVSetHotKeySwitchObserver(void (^observer)(int language)) {
+        _hotKeySwitchObserver = [observer copy];
     }
 
     int GTVGetLanguage() {
