@@ -19,10 +19,27 @@
 static NSString *const kAppName = @"VietTap";
 static NSString *const kImportedOpenKey = @"ImportedOpenKeySettings";
 
-// Menu bar icon: "V" in a filled rounded square (Vietnamese) or "E" in an
-// outlined one (English). Template images: macOS colors them for the menu
-// bar in light and dark mode.
+// Menu bar icon: the SF Symbols "v.square" (Vietnamese) and "e.square"
+// (English), so the icon has the same line weight and size as the system
+// and other menu bar icons. Symbols are template images: macOS colors them
+// for the menu bar in light and dark mode.
+static NSImage *VTDrawnStatusImage(BOOL vietnamese);
+
 static NSImage *VTStatusImage(BOOL vietnamese) {
+    NSString *name = vietnamese ? @"v.square" : @"e.square";
+    NSImage *symbol = [NSImage imageWithSystemSymbolName:name
+                                accessibilityDescription:vietnamese ? @"Vietnamese" : @"English"];
+    NSImageSymbolConfiguration *config =
+        [NSImageSymbolConfiguration configurationWithPointSize:13
+                                                        weight:NSFontWeightRegular
+                                                         scale:NSImageSymbolScaleLarge];
+    NSImage *image = [symbol imageWithSymbolConfiguration:config];
+    return image ?: VTDrawnStatusImage(vietnamese);
+}
+
+// Fallback when the symbol is not available: "V" in a filled rounded square
+// (Vietnamese) or "E" in an outlined one (English), drawn in code.
+static NSImage *VTDrawnStatusImage(BOOL vietnamese) {
     NSImage *image = [NSImage imageWithSize:NSMakeSize(19, 15) flipped:NO drawingHandler:^BOOL(NSRect rect) {
         CGContextRef ctx = [NSGraphicsContext currentContext].CGContext;
         NSRect box = NSInsetRect(rect, 1.5, 1.0);
