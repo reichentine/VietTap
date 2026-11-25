@@ -55,7 +55,11 @@ int vQuickEndConsonant = 0;
 int vRememberCode = 0;            // code table is fixed, nothing to remember
 int vTempOffOpenKey = 0;
 int vPerformLayoutCompat = 0;
-int vFixChromiumBrowser = 1;      // Chromium autocomplete fix (fixed on)
+// Off: Chromium browsers get the invisible character, as the other browsers
+// do. OpenKey's Shift+Left fix breaks web grids: in a Google Sheets cell in
+// "enter" mode, Shift+Left leaves the cell and selects the cell to its left,
+// and the next Backspace clears every selected cell.
+int vFixChromiumBrowser = 0;
 
 static CFMachPortRef _eventTap = NULL;
 static CFRunLoopSourceRef _runLoopSource = NULL;
