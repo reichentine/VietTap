@@ -48,6 +48,7 @@ final class AppModel: NSObject, ObservableObject {
     private var pausingSourceIsVietnamese = false
     private var permissionTimer: Timer?
     private var watchdog: Timer?
+    private var runningAppsObservation: NSKeyValueObservation?
     private let defaults = UserDefaults.standard
 
     // MARK: - Launch
@@ -147,6 +148,23 @@ final class AppModel: NSObject, ObservableObject {
 
     func quitOtherApp() {
         Self.runningOtherApps().forEach { $0.terminate() }
+        otherAppsChanged() // in case the app had already quit
+    }
+
+    /// Stop the hook when Gõ Tiếng Việt or VietTap Beta opens, and start it
+    /// again when it quits.
+    private func otherAppsChanged() {
+        let other = Self.runningOtherApps().first
+        if let other, !otherAppIsRunning {
+            VTHookStop()
+            otherAppIsRunning = true
+            otherAppName = other.localizedName ?? ""
+            log.info("\(self.otherAppName, privacy: .public) opened, the hook waits")
+            refresh()
+        } else if other == nil, otherAppIsRunning {
+            log.info("\(self.otherAppName, privacy: .public) quit")
+            startHookIfPossible(otherAppQuit: true)
+        }
     }
 
     private static func runningOtherApps() -> [NSRunningApplication] {
@@ -309,25 +327,12 @@ final class AppModel: NSObject, ObservableObject {
             VTHookStop()
             self.startHook()
         }
-        // Stop the hook when Gõ Tiếng Việt or VietTap Beta opens, and start it
-        // again when it quits.
-        center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] note in
-            guard let self, Self.isOtherApp(note) else { return }
-            self.startHookIfPossible(otherAppQuit: true)
+        // Watch the list of running apps for Gõ Tiếng Việt and VietTap Beta.
+        // The launch and terminate notifications are not used: macOS does not
+        // send them for menu bar apps (LSUIElement), and both apps are such.
+        runningAppsObservation = NSWorkspace.shared.observe(\.runningApplications) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.otherAppsChanged() }
         }
-        center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
-            guard let self, Self.isOtherApp(note) else { return }
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            VTHookStop()
-            self.otherAppIsRunning = true
-            self.otherAppName = app?.localizedName ?? ""
-            self.refresh()
-        }
-    }
-
-    private static func isOtherApp(_ note: Notification) -> Bool {
-        let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-        return app?.bundleIdentifier.map(otherAppIDs.contains) ?? false
     }
 }
 
