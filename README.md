@@ -2,9 +2,11 @@
 
 A lean Vietnamese input app for macOS that lives only in the menu bar. It uses
 the typing engine of [OpenKey](https://github.com/tuyenvm/OpenKey) by Tuyen Mai,
-unchanged, with a much smaller app around it.
+unchanged, with a much smaller app around it. The app is written in Swift and
+SwiftUI; the keyboard hook and the engine are OpenKey's Objective-C++ and C++.
 
-VietTap was named "Gõ Tiếng Việt" up to version 1.2.
+VietTap was named "Gõ Tiếng Việt" up to version 1.2. Up to version 1.3 its
+front end was written in Objective-C (see the `v1.3` tag).
 
 ## Install
 
@@ -17,7 +19,7 @@ VietTap was named "Gõ Tiếng Việt" up to version 1.2.
 - **Menu bar only.** A `V` (Vietnamese) or `E` (English) icon. It is a template
   image, so it follows light and dark mode. No Dock icon, no main window.
 - **Small menu.** Vietnamese on/off, Settings…, Quit.
-- **One small Settings window**, built with standard AppKit controls:
+- **One small Settings window**, built with standard SwiftUI controls:
   switch key, switch sound, spell check, remember the input for each app,
   open at login.
 - **Switch sound.** The switch key plays the macOS "Tink" sound when
@@ -25,7 +27,7 @@ VietTap was named "Gõ Tiếng Việt" up to version 1.2.
   The menu and the per-app memory change the input without a sound.
 - **Fixed choices.** Telex, Unicode, and OpenKey's browser autocomplete fixes.
 - **No helper apps, no update check, no network access, no storyboard.**
-  The whole app is about 400 KB.
+  The whole app is about 800 KB.
 
 ## Differences from OpenKey 2.0.5
 
@@ -65,7 +67,7 @@ changes are about latency and robustness:
 
 ## Requirements
 
-- macOS 13 or later, Apple Silicon (`arm64`).
+- macOS 14 or later, Apple Silicon (`arm64`).
 - Accessibility permission (System Settings › Privacy & Security › Accessibility).
 
 ## Build
@@ -77,8 +79,10 @@ Only the Command Line Tools are needed (`xcode-select --install`); Xcode is not.
 open build/VietTap.app
 ```
 
-The script compiles `Sources/VietTap` and the OpenKey engine
-(`Sources/OpenKey/engine`) with clang and builds the app bundle in `build/`.
+The script compiles the keyboard hook (`Sources/VietTap/KeyHook.mm`) and the
+OpenKey engine (`Sources/OpenKey/engine`) with clang, compiles the SwiftUI app
+(`Sources/VietTapSwift`) with swiftc, and builds the app bundle in `build/`.
+Swift calls the hook through `Sources/VietTap/VTHook.h`.
 It signs the app with a code-signing identity named **"OpenKey Local Signing"**
 if your keychain has one, and ad hoc otherwise. With a stable identity, the
 Accessibility permission stays valid after a rebuild; with an ad hoc signature,
@@ -94,13 +98,17 @@ open System Settings › Privacy & Security and click **Open Anyway**. Then gran
 the Accessibility permission when asked.
 
 Do not run VietTap and another Vietnamese input app (OpenKey, EVKey,
-…) at the same time: each key would be converted twice.
+…) at the same time: each key would be converted twice. VietTap pauses by
+itself while Gõ Tiếng Việt or VietTap Beta is open, and its menu can quit them.
 
 ## Settings storage
 
-Preferences are in the `com.sonvu.viettap` defaults domain. On the first
-launch, the app copies the switch key, spell check, smart switch and per-app
-languages from OpenKey (`com.tuyenmai.openkey`) if they exist.
+Preferences are in the `com.sonvu.viettap` defaults domain, the same as in
+VietTap 1.x, so an update keeps them. On the first launch of a new install,
+the app copies the switch key, switch sound, spell check, smart switch and
+per-app languages from the first of these that exists: VietTap Beta
+(`com.sonvu.viettap.beta`), Gõ Tiếng Việt (`com.sonvu.gotiengviet`) or OpenKey
+(`com.tuyenmai.openkey`).
 
 ## License
 

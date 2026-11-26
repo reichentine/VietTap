@@ -1,6 +1,6 @@
 //
 //  Settings.swift
-//  VietTap (Swift beta)
+//  VietTap
 //
 //  The Settings window, the switch key recorder, the menu bar icon and the
 //  switch sound.

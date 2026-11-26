@@ -1,6 +1,6 @@
 //
 //  AppModel.swift
-//  VietTap (Swift beta)
+//  VietTap
 //
 //  App state and everything around the hook: settings, Accessibility,
 //  input source, workspace notifications and the login item.
@@ -13,7 +13,7 @@ import Carbon
 import ServiceManagement
 import os
 
-private let log = Logger(subsystem: "com.sonvu.viettap.beta", category: "app")
+private let log = Logger(subsystem: "com.sonvu.viettap", category: "app")
 
 enum Pref {
     static let language = "InputMethod"          // 0 English, 1 Vietnamese
@@ -29,13 +29,15 @@ enum Pref {
 final class AppModel: NSObject, ObservableObject {
     static let shared = AppModel()
     static let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "VietTap"
-    /// The Objective-C VietTap. Both apps must never hook the keyboard at once.
-    static let otherAppID = "com.sonvu.viettap"
+    /// Other apps with the same keyboard hook: Gõ Tiếng Việt (the old name)
+    /// and VietTap Beta. Two hooks at once would convert each key twice.
+    static let otherAppIDs: Set<String> = ["com.sonvu.gotiengviet", "com.sonvu.viettap.beta"]
 
     @Published private(set) var running = false
     @Published private(set) var inputSourcePaused = false
     @Published private(set) var vietnamese = true
     @Published private(set) var otherAppIsRunning = false
+    @Published private(set) var otherAppName = ""
     @Published private(set) var hotKey = HotKey.controlShift
     @Published private(set) var playSound = true
     @Published private(set) var spelling = true
@@ -74,19 +76,25 @@ final class AppModel: NSObject, ObservableObject {
             Pref.switchKey: Int(HotKey.controlShift),
             Pref.spelling: true,
             Pref.smartSwitch: true,
-            Pref.openAtLogin: false, // a beta never adds itself to login items
+            Pref.openAtLogin: true,
             Pref.switchSound: true,
         ])
     }
 
-    /// On the first launch, take over the settings of VietTap, or else of
-    /// OpenKey. "Open at login" is not copied.
+    /// On the first launch, take over the settings of VietTap Beta, or else of
+    /// Gõ Tiếng Việt, or else of OpenKey. "Open at login" is not copied.
+    /// VietTap 1.x used this same domain, so its settings stay as they are.
     private func importSettingsIfNeeded() {
         guard !defaults.bool(forKey: Pref.imported) else { return }
         defaults.set(true, forKey: Pref.imported)
+        // VietTap 1.x wrote this key on its first launch.
+        if defaults.object(forKey: "ImportedOpenKeySettings") != nil {
+            log.info("settings of VietTap 1.x kept")
+            return
+        }
         let keys = [Pref.language, Pref.switchKey, Pref.spelling, Pref.smartSwitch,
                     Pref.smartData, Pref.switchSound]
-        for suite in [Self.otherAppID, "com.tuyenmai.openkey"] {
+        for suite in ["com.sonvu.viettap.beta", "com.sonvu.gotiengviet", "com.tuyenmai.openkey"] {
             guard let source = UserDefaults(suiteName: suite),
                   source.object(forKey: Pref.switchKey) != nil else { continue }
             for key in keys {
@@ -107,14 +115,14 @@ final class AppModel: NSObject, ObservableObject {
 
     // MARK: - Hook
 
-    /// otherAppQuit: VietTap just quit. At that moment it can still be in the
-    /// list of running apps, so do not look it up.
+    /// otherAppQuit: an app in otherAppIDs just quit. At that moment it can
+    /// still be in the list of running apps, so do not look it up.
     private func startHookIfPossible(otherAppQuit: Bool = false) {
-        otherAppIsRunning = !otherAppQuit && NSRunningApplication
-            .runningApplications(withBundleIdentifier: Self.otherAppID)
-            .contains { !$0.isTerminated }
+        let other = otherAppQuit ? nil : Self.runningOtherApps().first
+        otherAppIsRunning = other != nil
+        otherAppName = other?.localizedName ?? ""
         if otherAppIsRunning {
-            log.info("VietTap is open, the hook waits")
+            log.info("\(self.otherAppName, privacy: .public) is open, the hook waits")
             refresh()
         } else if AXIsProcessTrusted() {
             startHook()
@@ -138,8 +146,12 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     func quitOtherApp() {
-        NSRunningApplication.runningApplications(withBundleIdentifier: Self.otherAppID)
-            .forEach { $0.terminate() }
+        Self.runningOtherApps().forEach { $0.terminate() }
+    }
+
+    private static func runningOtherApps() -> [NSRunningApplication] {
+        otherAppIDs.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
+            .filter { !$0.isTerminated }
     }
 
     // MARK: - Accessibility
@@ -178,7 +190,7 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     var statusText: String {
-        if otherAppIsRunning { return "\(Self.appName): paused while VietTap is open" }
+        if otherAppIsRunning { return "\(Self.appName): paused while \(otherAppName) is open" }
         if !running { return "\(Self.appName): needs Accessibility access" }
         if inputSourcePaused { return "\(Self.appName): paused while \(pausingSourceName) is selected" }
         return "\(Self.appName): \(vietnamese ? "Vietnamese" : "English")"
@@ -297,22 +309,25 @@ final class AppModel: NSObject, ObservableObject {
             VTHookStop()
             self.startHook()
         }
-        // Start or stop the hook when the Objective-C VietTap quits or opens.
+        // Stop the hook when Gõ Tiếng Việt or VietTap Beta opens, and start it
+        // again when it quits.
         center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let self, Self.isOtherApp(note) else { return }
             self.startHookIfPossible(otherAppQuit: true)
         }
         center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let self, Self.isOtherApp(note) else { return }
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             VTHookStop()
             self.otherAppIsRunning = true
+            self.otherAppName = app?.localizedName ?? ""
             self.refresh()
         }
     }
 
     private static func isOtherApp(_ note: Notification) -> Bool {
         let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-        return app?.bundleIdentifier == otherAppID
+        return app?.bundleIdentifier.map(otherAppIDs.contains) ?? false
     }
 }
 

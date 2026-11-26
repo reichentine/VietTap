@@ -2,7 +2,8 @@
 //  VTHook.h
 //  VietTap — a lean menu bar front end for the OpenKey engine.
 //
-//  Interface between the app (AppDelegate) and the keyboard hook (KeyHook.mm).
+//  Interface between the app (Sources/VietTapSwift, through the Swift bridging
+//  header) and the keyboard hook (KeyHook.mm).
 //  Everything runs on the main thread: the event tap is attached to the main
 //  run loop, and the app calls these functions only from the main thread.
 //

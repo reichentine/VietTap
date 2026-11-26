@@ -1,10 +1,10 @@
 //
 //  VietTapApp.swift
-//  VietTap (Swift beta)
+//  VietTap
 //
 //  The app in SwiftUI: a menu bar extra and a Settings window. The keyboard
-//  hook (KeyHook.mm) and the OpenKey engine are the same as in the
-//  Objective-C app; Swift calls them through VTHook.h.
+//  hook (KeyHook.mm) and the OpenKey engine are in Objective-C++ and C++;
+//  Swift calls them through VTHook.h.
 //
 
 import SwiftUI
@@ -42,8 +42,8 @@ struct MenuContent: View {
 
     var body: some View {
         if model.otherAppIsRunning {
-            Text("Paused: VietTap is open")
-            Button("Quit VietTap") { model.quitOtherApp() }
+            Text("Paused: \(model.otherAppName) is open")
+            Button("Quit \(model.otherAppName)") { model.quitOtherApp() }
             Divider()
         } else if !model.running {
             Button("Allow Accessibility Access…") { model.openAccessibilitySettings() }
